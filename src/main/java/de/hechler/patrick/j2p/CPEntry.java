@@ -100,7 +100,7 @@ public sealed interface CPEntry {
 		
 	}
 	
-	final class CPEMethodRef implements CPEntry {
+	sealed class CPENormalMethodRef implements CPEntry {
 		
 		public final int classIndex;
 		public final int nameAndTypeIndex;
@@ -109,7 +109,7 @@ public sealed interface CPEntry {
 		private String name;
 		private JType  type;
 		
-		public CPEMethodRef(int classIndex, int nameAndTypeIndex) { this.classIndex = classIndex; this.nameAndTypeIndex = nameAndTypeIndex; }
+		public CPENormalMethodRef(int classIndex, int nameAndTypeIndex) { this.classIndex = classIndex; this.nameAndTypeIndex = nameAndTypeIndex; }
 		
 		public void initVals(JType cls, String name, JType type) {
 			if (this.cls != null) {
@@ -143,45 +143,18 @@ public sealed interface CPEntry {
 		
 	}
 	
-	final class CPEInterfaceMethodRef implements CPEntry {
+	final class CPEMethodRef extends CPENormalMethodRef {
 		
-		public final int classIndex;
-		public final int nameAndTypeIndex;
-		
-		private JType  cls;
-		private String name;
-		private JType  type;
-		
-		public CPEInterfaceMethodRef(int classIndex, int nameAndTypeIndex) { this.classIndex = classIndex; this.nameAndTypeIndex = nameAndTypeIndex; }
-		
-		public void initVals(JType cls, String name, JType type) {
-			if (this.cls != null) {
-				if (!this.cls.equals(cls) || !this.name.equals(name) || !this.type.equals(type)) {
-					throw new AssertionError();
-				}
-			} else {
-				this.cls  = cls;
-				this.name = name;
-				this.type = type;
-			}
+		public CPEMethodRef(int classIndex, int nameAndTypeIndex) {
+			super(classIndex, nameAndTypeIndex);
 		}
 		
-		public JType cls() {
-			JType c = this.cls;
-			if (c == null) throw new AssertionError();
-			return c;
-		}
+	}
+	
+	final class CPEInterfaceMethodRef extends CPENormalMethodRef {
 		
-		public String name() {
-			String n = this.name;
-			if (n == null) throw new AssertionError();
-			return n;
-		}
-		
-		public JType type() {
-			JType t = this.type;
-			if (t == null) throw new AssertionError();
-			return t;
+		public CPEInterfaceMethodRef(int classIndex, int nameAndTypeIndex) {
+			super(classIndex, nameAndTypeIndex);
 		}
 		
 	}
@@ -309,6 +282,18 @@ public sealed interface CPEntry {
 				}
 				this.imref = im;
 			}
+		}
+		
+		public CPEFieldRef fieldRef() {
+			return this.fref;
+		}
+		
+		public CPEInterfaceMethodRef interfaceMethodRef() {
+			return this.imref;
+		}
+		
+		public CPEMethodRef methodRef() {
+			return this.mref;
 		}
 		
 	}
