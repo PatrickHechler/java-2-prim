@@ -13,6 +13,11 @@ public class ClassFile {
 	private JType[]         interfaces;
 	private JField[]        fields;
 	private JMethod[]       methods;
+	private JBootstrap[]    bootstrapMethods;
+	private JType           nestHost;
+	private JType[]         nestMembers;
+	private JType[]         permittedSubclasses;
+	private boolean         finish;
 	
 	public ClassFile(int minor, int major, CPEntry[] constantPool) {
 		this.minor        = minor;
@@ -33,6 +38,7 @@ public class ClassFile {
 	}
 	
 	public void init0(int accessFlags, JType thisClass, JType superClass) {
+		notFinish();
 		if (this.accessFlags != 0) {
 			throw new AssertionError();
 		}
@@ -42,13 +48,15 @@ public class ClassFile {
 	}
 	
 	public void init1(JType[] interfaces) {
+		notFinish();
 		if (this.interfaces != null) {
 			throw new AssertionError();
 		}
 		this.interfaces = interfaces;
 	}
-
+	
 	public void init2(JField[] fields) {
+		notFinish();
 		if (this.fields != null) {
 			throw new AssertionError();
 		}
@@ -56,10 +64,54 @@ public class ClassFile {
 	}
 	
 	public void init3(JMethod[] methods) {
+		notFinish();
 		if (this.methods != null) {
 			throw new AssertionError();
 		}
 		this.methods = methods;
+	}
+	
+	public void initBootstrapMethods(JBootstrap[] bootstrapMethods) {
+		notFinish();
+		if (this.bootstrapMethods != null) {
+			throw new ClassFormatError("multiple BootstrapMethods attributes!");
+		}
+		this.bootstrapMethods = bootstrapMethods;
+	}
+	
+	public void initNestHost(JType nestHost) {
+		notFinish();
+		if (this.nestHost != null) {
+			throw new ClassFormatError("multiple NestHost attributes!");
+		}
+		this.nestHost = nestHost;
+	}
+	
+	public void initNestMembers(JType[] nestMembers) {
+		notFinish();
+		if (this.nestMembers != null) {
+			throw new ClassFormatError("multiple NestMembers attributes!");
+		}
+		this.nestMembers = nestMembers;
+	}
+	
+	public void initPermittedSubclasses(JType[] permittedSubclasses) {
+		notFinish();
+		if (this.permittedSubclasses != null) {
+			throw new ClassFormatError("multiple PermittedSubclasses attributes!");
+		}
+		this.permittedSubclasses = permittedSubclasses;
+	}
+	
+	public void finish() {
+		notFinish();
+		this.finish = true;
+	}
+	
+	private void notFinish() throws AssertionError {
+		if (this.finish) {
+			throw new AssertionError();
+		}
 	}
 	
 	public CPEntry[] gonstantPool() {
@@ -84,6 +136,22 @@ public class ClassFile {
 	
 	public JField[] fields() {
 		return this.fields;
+	}
+	
+	public JBootstrap[] bootstrapMethods() {
+		return this.bootstrapMethods;
+	}
+	
+	public JType nestHost() {
+		return this.nestHost;
+	}
+	
+	public JType[] nestMembers() {
+		return this.nestMembers;
+	}
+	
+	public JType[] permittedSubclasses() {
+		return this.permittedSubclasses;
 	}
 	
 }

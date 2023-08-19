@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.hechler.patrick.j2p.CPEntry.CPENameAndType;
 import de.hechler.patrick.j2p.JCommand.SimpleCommands;
 
 @SuppressWarnings("javadoc")
@@ -24,9 +25,63 @@ public class ClassReader {
 		return f;
 	}
 	
-	private static void readAttributes(AlignableDataInput in, ClassFile f) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	private static void readAttributes(AlignableDataInput in, ClassFile f) throws IOException {
+		int alen = in.readUnsignedShort();
+		for (int i = 0; i < alen; i++) {
+			String name = f.cp(CPEntry.CPEUtf8.class, in.readUnsignedShort()).val();
+			switch (name) {
+			case "BootstrapMethods" -> {
+				int          bmlen            = in.readUnsignedShort();
+				JBootstrap[] bootstrapMethods = new JBootstrap[bmlen];
+				for (int bmi = 0; bmi < bmlen; bmi++) {
+					CPEntry   e     = f.cp(CPEntry.class, in.readUnsignedShort());
+					int       balen = in.readUnsignedShort();
+					CPEntry[] ba    = new CPEntry[balen];
+					for (int bai = 0; bai < balen; bai++) {
+						ba[bai] = f.cp(CPEntry.class, in.readUnsignedShort());
+					}
+					if (e instanceof CPEntry.CPEInvokeDynamic id) {
+						if (id.bootstrapMetAttrIndex() != bmi) {
+							throw new ClassFormatError("the bootstrap entry refers to a invoke dynamic entry which refers to a different bootstrap entry!");
+						}
+						bootstrapMethods[bmi] = new JBootstrap.InvokeDynamic(id, ba);
+					} else if (e instanceof CPEntry.CPEDynamic d) {
+						if (d.bootstrapMetAttrIndex() != bmi) {
+							throw new ClassFormatError("the bootstrap entry refers to a dynamic entry which refers to a different bootstrap entry!");
+						}
+						bootstrapMethods[bmi] = new JBootstrap.Dynamic(d, ba);
+					} else {
+						throw new ClassFormatError("all bootstrap method entries must refer to a invokeDynamic or dynamic class path entry");
+					}
+				}
+				f.initBootstrapMethods(bootstrapMethods);
+			}
+			case "NestHost" -> {
+				readInt(in, 2);
+				f.initNestHost(f.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type());
+			}
+			case "NestMembers" -> {
+				in.readInt();
+				int     nmlen       = in.readUnsignedShort();
+				JType[] nestMembers = new JType[nmlen];
+				for (int nmi = 0; nmi < nmlen; nmi++) {
+					nestMembers[nmi] = f.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type();
+				}
+				f.initNestMembers(nestMembers);
+			}
+			case "PermittedSubclasses" -> {
+				in.readInt();
+				int     psclen              = in.readUnsignedShort();
+				JType[] permittedSubclasses = new JType[psclen];
+				for (int nmi = 0; nmi < psclen; nmi++) {
+					permittedSubclasses[nmi] = f.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type();
+				}
+				f.initPermittedSubclasses(permittedSubclasses);
+			}
+			default -> skipAttribute(in);
+			}
+		}
+		f.finish();
 	}
 	
 	private static void readMethods(AlignableDataInput in, ClassFile f) throws IOException {
@@ -41,28 +96,107 @@ public class ClassReader {
 			for (int ai = 0; ai < alen; ai++) {
 				String attrName = f.cp(CPEntry.CPEUtf8.class, in.readUnsignedShort()).val();
 				if ("Code".equals(attrName)) {
-					in.readInt();
-					int        maxStack  = in.readUnsignedShort();
-					int        maxLocals = in.readUnsignedShort();
-					final long codeEnd   = in.readInt() & 0xFFFFFFFFL;
-					in.address(0L);
-					method.initCode(maxStack, maxLocals);
-					while (in.address() < codeEnd) {
-						long     addr = in.address();
-						JCommand cmd  = readCommand(in, method);
-						cmd.initAdress(addr);
-						method.addCommand(cmd);
-					}
-					if (in.address() != codeEnd) {
-						throw new ClassFormatError("the code segment did not end at the promised address!");
-					}
+					readCodeAttribute(in, f, i, method);
 				} else {
 					skipAttribute(in);
 				}
+				method.finish();
 			}
 			mets[i] = method;
 		}
 		f.init3(mets);
+	}
+	
+	private static void readCodeAttribute(AlignableDataInput in, ClassFile f, int i, JMethod method) throws IOException, ClassFormatError {
+		in.readInt();
+		int        maxStack  = in.readUnsignedShort();
+		int        maxLocals = in.readUnsignedShort();
+		final long codeEnd   = in.readInt() & 0xFFFFFFFFL;
+		in.address(0L);
+		method.initCode(maxStack, maxLocals);
+		while (in.address() < codeEnd) {
+			long     addr = in.address();
+			JCommand cmd  = readCommand(in, method);
+			cmd.initAdress(addr);
+			method.addCommand(cmd);
+		}
+		if (in.address() != codeEnd) {
+			throw new ClassFormatError("the code segment did not end at the promised address!");
+		}
+		final int           excepLen = in.readUnsignedShort();
+		JExceptionHandler[] handlers = new JExceptionHandler[excepLen];
+		for (int ei = 0; ei < excepLen; ei++) {
+			int   start   = in.readUnsignedShort();
+			int   end     = in.readUnsignedShort();
+			int   handler = in.readUnsignedShort();
+			JType type    = f.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type();
+			handlers[ei] = new JExceptionHandler(start, end, handler, type);
+		}
+		method.initHandlers(handlers);
+		final int calen = in.readUnsignedShort();
+		for (int cai = 0; cai < calen; cai++) {
+			String cattrName = f.cp(CPEntry.CPEUtf8.class, in.readUnsignedShort()).val();
+			if ("StackMapTable".equals(cattrName)) {
+				in.readInt();
+				// the method fills the first implicit entry
+				final int        smtLen  = in.readUnsignedShort() + 1;
+				JStackMapEntry[] entries = new JStackMapEntry[smtLen];
+				for (int smti = 1; smti < smtLen; smti++) {
+					int smfTag = in.readUnsignedByte();
+					if (smfTag <= 63) {
+						entries[i] = new JStackMapEntry.SameLocalsNewStack(smfTag);
+					} else if (smfTag <= 127) {
+						JSMEVerificationInfo[] vis = readVerificationInfos(in, f, 1);
+						entries[i] = new JStackMapEntry.SameLocalsNewStack(smfTag - 64, vis);
+					} else if (smfTag <= 246) {
+						throw new ClassFormatError("the stack map table tags [128-246] are reserved for future use");
+					} else if (smfTag == 247) {
+						int                    offsetDelta = in.readUnsignedShort();
+						JSMEVerificationInfo[] vis         = readVerificationInfos(in, f, 1);
+						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, vis);
+					} else if (smfTag <= 250) {
+						int                    offsetDelta = in.readUnsignedShort();
+						JSMEVerificationInfo[] vis         = readVerificationInfos(in, f, 1);
+						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, vis, 251 - smfTag);
+					} else if (smfTag == 251) {
+						int offsetDelta = in.readUnsignedShort();
+						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta);
+					} else if (smfTag <= 254) {
+						int                    offsetDelta = in.readUnsignedShort();
+						JSMEVerificationInfo[] vis         = readVerificationInfos(in, f, smfTag - 251);
+						entries[i] = new JStackMapEntry.AppendedLocalsEmptyStack(offsetDelta, vis);
+					} else { // 255 (smfTag is an unsigned byte)
+						int                    offsetDelta = in.readUnsignedShort();
+						JSMEVerificationInfo[] locals      = readVerificationInfos(in, f, in.readUnsignedShort());
+						JSMEVerificationInfo[] stack       = readVerificationInfos(in, f, in.readUnsignedShort());
+						entries[i] = new JStackMapEntry.FullDescribtion(offsetDelta, locals, stack);
+					}
+				}
+				method.initStackMapTable(entries);
+			} else {
+				skipAttribute(in);
+			}
+		}
+	}
+	
+	private static JSMEVerificationInfo[] readVerificationInfos(AlignableDataInput in, ClassFile f, final int count) throws IOException, ClassFormatError {
+		JSMEVerificationInfo[] res = new JSMEVerificationInfo[count];
+		for (int i = 0; i < count; i++) {
+			int vtiTag = in.readUnsignedByte();
+			res[i] = switch (vtiTag) {
+			case 0 -> JSMEVerificationInfo.SimpleInfo.TOP;
+			case 1 -> JSMEVerificationInfo.SimpleInfo.INTEGER;
+			case 2 -> JSMEVerificationInfo.SimpleInfo.FLOAT;
+			case 5 -> JSMEVerificationInfo.SimpleInfo.NULL;
+			case 6 -> JSMEVerificationInfo.SimpleInfo.UNINITIALIZEDTHIS;
+			case 7 -> new JSMEVerificationInfo.ObjectInfo(f.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type());
+			case 8 -> new JSMEVerificationInfo.UninitilizedInfo(in.readUnsignedShort());
+			case 4 -> JSMEVerificationInfo.SimpleInfo.LONG;
+			case 3 -> JSMEVerificationInfo.SimpleInfo.DOUBLE;
+			default -> throw new ClassFormatError("invalid verification_type_info tag: " + vtiTag);
+			};
+		}
+		return res;
 	}
 	
 	public enum JVMType {
@@ -101,166 +235,260 @@ public class ClassReader {
 	
 	private static JCommand readCommand(AlignableDataInput in, JMethod method) throws IOException {
 		int b = in.readUnsignedByte();
+		return switch ((b >>> 4) & 0x0F) {
+		case 0x0 -> readCommand0(in, method, b);
+		case 0x1 -> readCommand1(in, method, b);
+		case 0x2 -> readCommand2(in, method, b);
+		case 0x3 -> readCommand3(in, method, b);
+		case 0x4 -> readCommand4(in, method, b);
+		case 0x5 -> readCommand5(in, method, b);
+		case 0x6 -> readCommand6(in, method, b);
+		case 0x7 -> readCommand7(in, method, b);
+		case 0x8 -> readCommand8(in, method, b);
+		case 0x9 -> readCommand9(in, method, b);
+		case 0xA -> readCommandA(in, method, b);
+		case 0xB -> readCommandB(in, method, b);
+		case 0xC -> readCommandC(in, method, b);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand0(AlignableDataInput in, JMethod method, int b) {
 		return switch (b) {
-		case 0x32 -> readArrayLoad(in, method, JVMType.REFERENCE);
-		case 0x53 -> readArrayStore(in, method, JVMType.REFERENCE);
+		case 0x00 -> readNOP(in, method);
 		case 0x01 -> readConst(in, method, JVMType.REFERENCE, 0L);
-		case 0x19 -> readLocalLoad(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
-		case 0x2A, 0x2B, 0x2C, 0x2D -> readLocalLoad(in, method, JVMType.REFERENCE, b - 0x2A, false);
-		case 0xBD -> readNewArray(in, method, true); // reference array
-		case 0xB0 -> readReturn(in, method, JVMType.REFERENCE);
-		case 0xBE -> readArrayLength(in, method);
-		case 0x3A -> readLocalStore(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
-		case 0x4B, 0x4C, 0x4D, 0x4E -> readLocalStore(in, method, JVMType.REFERENCE, b - 0x4B, false);
-		case 0xBF -> readAThrow(in, method);
-		case 0x33 -> readArrayLoad(in, method, JVMType.BYTE_BOOL);
-		case 0x54 -> readArrayStore(in, method, JVMType.BYTE_BOOL);
-		case 0x10 -> readPush(in, method, JVMType.BYTE_BOOL);
-		case 0x34 -> readArrayLoad(in, method, JVMType.CHAR);
-		case 0x55 -> readArrayStore(in, method, JVMType.CHAR);
-		case 0xC0 -> readCheckCast(in, method, true);
-		case 0x90 -> readPrimConvert(in, method, JVMType.DOUBLE, JVMType.FLOAT);
-		case 0x8E -> readPrimConvert(in, method, JVMType.DOUBLE, JVMType.INT);
-		case 0x8F -> readPrimConvert(in, method, JVMType.DOUBLE, JVMType.LONG);
-		case 0x63 -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.ADD);
-		case 0x31 -> readArrayLoad(in, method, JVMType.DOUBLE);
-		case 0x52 -> readArrayStore(in, method, JVMType.DOUBLE);
-		case 0x98 -> readFPCompare(in, method, JVMType.DOUBLE, 1);
-		case 0x97 -> readFPCompare(in, method, JVMType.DOUBLE, -1);
-		case 0x0E -> readConst(in, method, JVMType.DOUBLE, Double.doubleToRawLongBits(0D));
-		case 0x0F -> readConst(in, method, JVMType.DOUBLE, Double.doubleToRawLongBits(1D));
-		case 0x6F -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.DIV);
-		case 0x18 -> readLocalLoad(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
-		case 0x26, 0x27, 0x28, 0x29 -> readLocalLoad(in, method, JVMType.DOUBLE, b - 0x26, false);
-		case 0x6B -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.MUL);
-		case 0x77 -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.NEG);
-		case 0x73 -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.MOD);
-		case 0xAF -> readReturn(in, method, JVMType.DOUBLE);
-		case 0x39 -> readLocalStore(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
-		case 0x47, 0x48, 0x49, 0x4A -> readLocalStore(in, method, JVMType.DOUBLE, b - 0x47, false);
-		case 0x67 -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.SUB);
-		case 0x59, 0x5A, 0x5B -> readStackDup(in, method, b - 0x59, 1); // skipped entries // duplicate 1 entry
-		case 0x5C, 0x5D, 0x5E -> readStackDup(in, method, b - 0x5C, 2); // skipped entries // duplicate 2 entries
-		case 0x8D -> readPrimConvert(in, method, JVMType.FLOAT, JVMType.DOUBLE);
-		case 0x8B -> readPrimConvert(in, method, JVMType.FLOAT, JVMType.INT);
-		case 0x8C -> readPrimConvert(in, method, JVMType.FLOAT, JVMType.LONG);
-		case 0x62 -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.ADD);
-		case 0x30 -> readArrayLoad(in, method, JVMType.FLOAT);
-		case 0x51 -> readArrayStore(in, method, JVMType.FLOAT);
-		case 0x96 -> readFPCompare(in, method, JVMType.FLOAT, 1);
-		case 0x95 -> readFPCompare(in, method, JVMType.FLOAT, -1);
+		case 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 -> readConst(in, method, JVMType.INT, (0x03 - b)); // 0x02 is -1
+		case 0x09 -> readConst(in, method, JVMType.LONG, 0L);
+		case 0x0A -> readConst(in, method, JVMType.LONG, 1L);
 		case 0x0B -> readConst(in, method, JVMType.DOUBLE, Float.floatToRawIntBits(0F));
 		case 0x0C -> readConst(in, method, JVMType.DOUBLE, Float.floatToRawIntBits(1F));
 		case 0x0D -> readConst(in, method, JVMType.DOUBLE, Float.floatToRawIntBits(2F));
-		case 0x6E -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.DIV);
+		case 0x0E -> readConst(in, method, JVMType.DOUBLE, Double.doubleToRawLongBits(0D));
+		case 0x0F -> readConst(in, method, JVMType.DOUBLE, Double.doubleToRawLongBits(1D));
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand1(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0x10 -> readPush(in, method, JVMType.BYTE_BOOL);
+		case 0x11 -> readPush(in, method, JVMType.SHORT);
+		case 0x12 -> readLoadConstPool(in, method, false, 1);
+		case 0x13 -> readLoadConstPool(in, method, true, 1);
+		case 0x14 -> readLoadConstPool(in, method, true, 2);
+		case 0x15 -> readLocalLoad(in, method, JVMType.INT, -1, false); // modifiable by wide
+		case 0x16 -> readLocalLoad(in, method, JVMType.LONG, -1, false); // modifiable by wide
 		case 0x17 -> readLocalLoad(in, method, JVMType.FLOAT, -1, false); // modifiable by wide
+		case 0x18 -> readLocalLoad(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
+		case 0x19 -> readLocalLoad(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
+		case 0x1A, 0x1B, 0x1C, 0x1D -> readLocalLoad(in, method, JVMType.FLOAT, b - 0x1A, false);
+		case 0x1E, 0x1F -> readLocalLoad(in, method, JVMType.LONG, b - 0x1E, false);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand2(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0x20, 0x21 -> readLocalLoad(in, method, JVMType.LONG, b - 0x1E, false);
 		case 0x22, 0x23, 0x24, 0x25 -> readLocalLoad(in, method, JVMType.FLOAT, b - 0x22, false);
-		case 0x6A -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.MUL);
-		case 0x76 -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.NEG);
-		case 0x72 -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.MOD);
-		case 0xAE -> readReturn(in, method, JVMType.FLOAT);
+		case 0x26, 0x27, 0x28, 0x29 -> readLocalLoad(in, method, JVMType.DOUBLE, b - 0x26, false);
+		case 0x2A, 0x2B, 0x2C, 0x2D -> readLocalLoad(in, method, JVMType.REFERENCE, b - 0x2A, false);
+		case 0x2E -> readArrayLoad(in, method, JVMType.INT);
+		case 0x2F -> readArrayLoad(in, method, JVMType.LONG);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand3(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0x30 -> readArrayLoad(in, method, JVMType.FLOAT);
+		case 0x31 -> readArrayLoad(in, method, JVMType.DOUBLE);
+		case 0x32 -> readArrayLoad(in, method, JVMType.REFERENCE);
+		case 0x33 -> readArrayLoad(in, method, JVMType.BYTE_BOOL);
+		case 0x34 -> readArrayLoad(in, method, JVMType.CHAR);
+		case 0x35 -> readArrayLoad(in, method, JVMType.SHORT);
+		case 0x36 -> readLocalStore(in, method, JVMType.INT, -1, false); // modifiable by wide
+		case 0x37 -> readLocalStore(in, method, JVMType.LONG, -1, false); // modifiable by wide
 		case 0x38 -> readLocalStore(in, method, JVMType.FLOAT, -1, false); // modifiable by wide
+		case 0x39 -> readLocalStore(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
+		case 0x3A -> readLocalStore(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
+		case 0x3B, 0x3C, 0x3D, 0x3E -> readLocalStore(in, method, JVMType.INT, b - 0x3B, false);
+		case 0x3F -> readLocalStore(in, method, JVMType.REFERENCE, b - 0x3F, false);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand4(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0x40, 0x41, 0x42 -> readLocalStore(in, method, JVMType.REFERENCE, b - 0x3F, false);
 		case 0x43, 0x44, 0x45, 0x46 -> readLocalStore(in, method, JVMType.FLOAT, b - 0x43, false);
+		case 0x47, 0x48, 0x49, 0x4A -> readLocalStore(in, method, JVMType.DOUBLE, b - 0x47, false);
+		case 0x4B, 0x4C, 0x4D, 0x4E -> readLocalStore(in, method, JVMType.REFERENCE, b - 0x4B, false);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand5(AlignableDataInput in, JMethod method, int b) {
+		return switch (b) {
+		case 0x50 -> readArrayStore(in, method, JVMType.LONG);
+		case 0x51 -> readArrayStore(in, method, JVMType.FLOAT);
+		case 0x52 -> readArrayStore(in, method, JVMType.DOUBLE);
+		case 0x53 -> readArrayStore(in, method, JVMType.REFERENCE);
+		case 0x54 -> readArrayStore(in, method, JVMType.BYTE_BOOL);
+		case 0x55 -> readArrayStore(in, method, JVMType.CHAR);
+		case 0x56 -> readArrayStore(in, method, JVMType.SHORT);
+		case 0x57, 0x58 -> readPOP(in, method, b - 0x56); // 1 or 2 pop operations
+		case 0x59, 0x5A, 0x5B -> readStackDup(in, method, b - 0x59, 1); // skipped entries // duplicate 1 entry
+		case 0x5C, 0x5D, 0x5E -> readStackDup(in, method, b - 0x5C, 2); // skipped entries // duplicate 2 entries
+		case 0x5F -> readSwap(in, method);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand6(AlignableDataInput in, JMethod method, int b) {
+		return switch (b) {
+		case 0x60 -> readPrimMath(in, method, JVMType.INT, JVMMath.ADD);
+		case 0x61 -> readPrimMath(in, method, JVMType.LONG, JVMMath.ADD);
+		case 0x62 -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.ADD);
+		case 0x63 -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.ADD);
+		case 0x64 -> readPrimMath(in, method, JVMType.INT, JVMMath.SUB);
+		case 0x65 -> readPrimMath(in, method, JVMType.LONG, JVMMath.SUB);
 		case 0x66 -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.SUB);
-		case 0xB4 -> readGetField(in, method);
-		case 0xB2 -> readGetStaticField(in, method);
-		case 0xA7 -> readGoto(in, method, false); // non-wide
-		case 0xC8 -> readGoto(in, method, true); // wide
+		case 0x67 -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.SUB);
+		case 0x68 -> readPrimMath(in, method, JVMType.INT, JVMMath.MUL);
+		case 0x69 -> readPrimMath(in, method, JVMType.LONG, JVMMath.MUL);
+		case 0x6A -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.MUL);
+		case 0x6B -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.MUL);
+		case 0x6C -> readPrimMath(in, method, JVMType.INT, JVMMath.DIV);
+		case 0x6D -> readPrimMath(in, method, JVMType.LONG, JVMMath.DIV);
+		case 0x6E -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.DIV);
+		case 0x6F -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.DIV);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand7(AlignableDataInput in, JMethod method, int b) {
+		return switch (b) {
+		case 0x70 -> readPrimMath(in, method, JVMType.INT, JVMMath.MOD);
+		case 0x71 -> readPrimMath(in, method, JVMType.LONG, JVMMath.MOD);
+		case 0x72 -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.MOD);
+		case 0x73 -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.MOD);
+		case 0x74 -> readPrimMath(in, method, JVMType.INT, JVMMath.NEG);
+		case 0x75 -> readPrimMath(in, method, JVMType.LONG, JVMMath.NEG);
+		case 0x76 -> readPrimMath(in, method, JVMType.FLOAT, JVMMath.NEG);
+		case 0x77 -> readPrimMath(in, method, JVMType.DOUBLE, JVMMath.NEG);
+		case 0x78 -> readPrimMath(in, method, JVMType.INT, JVMMath.SHIFT_LEFT);
+		case 0x79 -> readPrimMath(in, method, JVMType.LONG, JVMMath.SHIFT_LEFT);
+		case 0x7A -> readPrimMath(in, method, JVMType.INT, JVMMath.SHIFT_ARITMETIC_RIGTH);
+		case 0x7B -> readPrimMath(in, method, JVMType.LONG, JVMMath.SHIFT_ARITMETIC_RIGTH);
+		case 0x7C -> readPrimMath(in, method, JVMType.INT, JVMMath.SHIFT_LOGIC_RIGTH);
+		case 0x7D -> readPrimMath(in, method, JVMType.LONG, JVMMath.SHIFT_LOGIC_RIGTH);
+		case 0x7E -> readPrimMath(in, method, JVMType.INT, JVMMath.AND);
+		case 0x7F -> readPrimMath(in, method, JVMType.LONG, JVMMath.AND);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand8(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0x80 -> readPrimMath(in, method, JVMType.INT, JVMMath.OR);
+		case 0x81 -> readPrimMath(in, method, JVMType.LONG, JVMMath.OR);
+		case 0x82 -> readPrimMath(in, method, JVMType.INT, JVMMath.XOR);
+		case 0x83 -> readPrimMath(in, method, JVMType.LONG, JVMMath.XOR);
+		case 0x84 -> readIInc(in, method, false); // modifiable by wide
+		case 0x85 -> readPrimConvert(in, method, JVMType.INT, JVMType.LONG);
+		case 0x86 -> readPrimConvert(in, method, JVMType.INT, JVMType.FLOAT);
+		case 0x87 -> readPrimConvert(in, method, JVMType.INT, JVMType.DOUBLE);
+		case 0x88 -> readPrimConvert(in, method, JVMType.LONG, JVMType.INT);
+		case 0x89 -> readPrimConvert(in, method, JVMType.LONG, JVMType.FLOAT);
+		case 0x8A -> readPrimConvert(in, method, JVMType.LONG, JVMType.DOUBLE);
+		case 0x8B -> readPrimConvert(in, method, JVMType.FLOAT, JVMType.INT);
+		case 0x8C -> readPrimConvert(in, method, JVMType.FLOAT, JVMType.LONG);
+		case 0x8D -> readPrimConvert(in, method, JVMType.FLOAT, JVMType.DOUBLE);
+		case 0x8E -> readPrimConvert(in, method, JVMType.DOUBLE, JVMType.INT);
+		case 0x8F -> readPrimConvert(in, method, JVMType.DOUBLE, JVMType.LONG);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommand9(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0x90 -> readPrimConvert(in, method, JVMType.DOUBLE, JVMType.FLOAT);
 		case 0x91 -> readPrimConvert(in, method, JVMType.INT, JVMType.BYTE_BOOL);
 		case 0x92 -> readPrimConvert(in, method, JVMType.INT, JVMType.CHAR);
-		case 0x87 -> readPrimConvert(in, method, JVMType.INT, JVMType.DOUBLE);
-		case 0x86 -> readPrimConvert(in, method, JVMType.INT, JVMType.FLOAT);
-		case 0x85 -> readPrimConvert(in, method, JVMType.INT, JVMType.LONG);
 		case 0x93 -> readPrimConvert(in, method, JVMType.INT, JVMType.SHORT);
-		case 0x60 -> readPrimMath(in, method, JVMType.INT, JVMMath.ADD);
-		case 0x2E -> readArrayLoad(in, method, JVMType.INT);
-		case 0x7E -> readPrimMath(in, method, JVMType.INT, JVMMath.AND);
-		case 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 -> readConst(in, method, JVMType.INT, (0x03 - b)); // 0x02 is -1
-		case 0x6C -> readPrimMath(in, method, JVMType.INT, JVMMath.DIV);
-		case 0xA5 -> readCompare(in, method, JVMType.REFERENCE, JVMCmp.EQUAL);
-		case 0xA6 -> readCompare(in, method, JVMType.REFERENCE, JVMCmp.NOT_EQUAL);
-		case 0x9F -> readCompare(in, method, JVMType.INT, JVMCmp.EQUAL);
-		case 0xA0 -> readCompare(in, method, JVMType.INT, JVMCmp.NOT_EQUAL);
-		case 0xA1 -> readCompare(in, method, JVMType.INT, JVMCmp.LOWER);
-		case 0xA2 -> readCompare(in, method, JVMType.INT, JVMCmp.GREATER_EQUAL);
-		case 0xA3 -> readCompare(in, method, JVMType.INT, JVMCmp.GREATER);
-		case 0xA4 -> readCompare(in, method, JVMType.INT, JVMCmp.LOWER_EQUAL);
+		case 0x94 -> readLongCompare(in, method);
+		case 0x95 -> readFPCompare(in, method, JVMType.FLOAT, -1);
+		case 0x96 -> readFPCompare(in, method, JVMType.FLOAT, 1);
+		case 0x97 -> readFPCompare(in, method, JVMType.DOUBLE, -1);
+		case 0x98 -> readFPCompare(in, method, JVMType.DOUBLE, 1);
 		case 0x99 -> readSign(in, method, JVMType.INT, JVMCmp.EQUAL);
 		case 0x9A -> readSign(in, method, JVMType.INT, JVMCmp.NOT_EQUAL);
 		case 0x9B -> readSign(in, method, JVMType.INT, JVMCmp.LOWER);
 		case 0x9C -> readSign(in, method, JVMType.INT, JVMCmp.GREATER_EQUAL);
 		case 0x9D -> readSign(in, method, JVMType.INT, JVMCmp.GREATER);
 		case 0x9E -> readSign(in, method, JVMType.INT, JVMCmp.LOWER_EQUAL);
-		case 0xC7 -> readSign(in, method, JVMType.REFERENCE, JVMCmp.NOT_EQUAL);
-		case 0xC6 -> readSign(in, method, JVMType.REFERENCE, JVMCmp.EQUAL);
-		case 0x84 -> readIInc(in, method, false); // modifiable by wide
-		case 0x15 -> readLocalLoad(in, method, JVMType.INT, -1, false); // modifiable by wide
-		case 0x1A, 0x1B, 0x1C, 0x1D -> readLocalLoad(in, method, JVMType.FLOAT, b - 0x1A, false);
-		case 0x68 -> readPrimMath(in, method, JVMType.INT, JVMMath.MUL);
-		case 0x74 -> readPrimMath(in, method, JVMType.INT, JVMMath.NEG);
-		case 0xC1 -> readCheckCast(in, method, false);
-		case 0xBA -> readInvokeDynamic(in, method);
-		case 0xB9 -> readInvokeInterface(in, method);
+		case 0x9F -> readCompare(in, method, JVMType.INT, JVMCmp.EQUAL);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommandA(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0xA0 -> readCompare(in, method, JVMType.INT, JVMCmp.NOT_EQUAL);
+		case 0xA1 -> readCompare(in, method, JVMType.INT, JVMCmp.LOWER);
+		case 0xA2 -> readCompare(in, method, JVMType.INT, JVMCmp.GREATER_EQUAL);
+		case 0xA3 -> readCompare(in, method, JVMType.INT, JVMCmp.GREATER);
+		case 0xA4 -> readCompare(in, method, JVMType.INT, JVMCmp.LOWER_EQUAL);
+		case 0xA5 -> readCompare(in, method, JVMType.REFERENCE, JVMCmp.EQUAL);
+		case 0xA6 -> readCompare(in, method, JVMType.REFERENCE, JVMCmp.NOT_EQUAL);
+		case 0xA7 -> readGoto(in, method, false); // non-wide
+		case 0xA8 -> readJSR(in, method, b); // maybe just fail (not supported since JavaSE 7)
+		case 0xA9 -> readRet(in, method, false); // non-wide // maybe just fail (not usable since JavaSE 7, since JSR is not supported)
+		case 0xAA -> readTableSwitch(in, method);
+		case 0xAB -> readLookupSwitch(in, method);
+		case 0xAC -> readReturn(in, method, JVMType.INT);
+		case 0xAD -> readReturn(in, method, JVMType.LONG);
+		case 0xAE -> readReturn(in, method, JVMType.FLOAT);
+		case 0xAF -> readReturn(in, method, JVMType.DOUBLE);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommandB(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0xB0 -> readReturn(in, method, JVMType.REFERENCE);
+		case 0xB1 -> readReturn(in, method, JVMType.VOID);
+		case 0xB2 -> readGetStaticField(in, method);
+		case 0xB3 -> readSetStaticField(in, method);
+		case 0xB4 -> readGetField(in, method);
+		case 0xB5 -> readSetField(in, method);
+		case 0xB6 -> readInvokeVirtual(in, method);
 		case 0xB7 -> readInvokeSpecial(in, method);
 		case 0xB8 -> readInvokeStatic(in, method);
-		case 0xB6 -> readInvokeVirtual(in, method);
-		case 0x80 -> readPrimMath(in, method, JVMType.INT, JVMMath.OR);
-		case 0x70 -> readPrimMath(in, method, JVMType.INT, JVMMath.MOD);
-		case 0xAC -> readReturn(in, method, JVMType.INT);
-		case 0x78 -> readPrimMath(in, method, JVMType.INT, JVMMath.SHIFT_LEFT);
-		case 0x7A -> readPrimMath(in, method, JVMType.INT, JVMMath.SHIFT_ARITMETIC_RIGTH);
-		case 0x36 -> readLocalStore(in, method, JVMType.INT, -1, false); // modifiable by wide
-		case 0x3B, 0x3C, 0x3D, 0x3E -> readLocalStore(in, method, JVMType.INT, b - 0x3B, false);
-		case 0x64 -> readPrimMath(in, method, JVMType.INT, JVMMath.SUB);
-		case 0x7C -> readPrimMath(in, method, JVMType.INT, JVMMath.SHIFT_LOGIC_RIGTH);
-		case 0x82 -> readPrimMath(in, method, JVMType.INT, JVMMath.XOR);
-		case 0xA8, 0xC9 -> readJSR(in, method, b); // maybe just fail (not supported since JavaSE 7)
-		case 0x8A -> readPrimConvert(in, method, JVMType.LONG, JVMType.DOUBLE);
-		case 0x89 -> readPrimConvert(in, method, JVMType.LONG, JVMType.FLOAT);
-		case 0x88 -> readPrimConvert(in, method, JVMType.LONG, JVMType.INT);
-		case 0x61 -> readPrimMath(in, method, JVMType.LONG, JVMMath.ADD);
-		case 0x2F -> readArrayLoad(in, method, JVMType.LONG);
-		case 0x7F -> readPrimMath(in, method, JVMType.LONG, JVMMath.AND);
-		case 0x50 -> readArrayStore(in, method, JVMType.LONG);
-		case 0x94 -> readLongCompare(in, method);
-		case 0x09 -> readConst(in, method, JVMType.LONG, 0L);
-		case 0x0A -> readConst(in, method, JVMType.LONG, 1L);
-		case 0x12 -> readLoadConstPool(in, method, false, 1);
-		case 0x13 -> readLoadConstPool(in, method, true, 1);
-		case 0x14 -> readLoadConstPool(in, method, true, 2);
-		case 0x6D -> readPrimMath(in, method, JVMType.LONG, JVMMath.DIV);
-		case 0x16 -> readLocalLoad(in, method, JVMType.LONG, -1, false); // modifiable by wide
-		case 0x1E, 0x1F, 0x20, 0x21 -> readLocalLoad(in, method, JVMType.LONG, b - 0x1E, false);
-		case 0x69 -> readPrimMath(in, method, JVMType.LONG, JVMMath.MUL);
-		case 0x75 -> readPrimMath(in, method, JVMType.LONG, JVMMath.NEG);
-		case 0xAB -> readLookupSwitch(in, method);
-		case 0x81 -> readPrimMath(in, method, JVMType.LONG, JVMMath.OR);
-		case 0x71 -> readPrimMath(in, method, JVMType.LONG, JVMMath.MOD);
-		case 0xAD -> readReturn(in, method, JVMType.LONG);
-		case 0x79 -> readPrimMath(in, method, JVMType.LONG, JVMMath.SHIFT_LEFT);
-		case 0x7B -> readPrimMath(in, method, JVMType.LONG, JVMMath.SHIFT_ARITMETIC_RIGTH);
-		case 0x37 -> readLocalStore(in, method, JVMType.LONG, -1, false); // modifiable by wide
-		case 0x3F, 0x40, 0x41, 0x42 -> readLocalStore(in, method, JVMType.REFERENCE, b - 0x3F, false);
-		case 0x65 -> readPrimMath(in, method, JVMType.LONG, JVMMath.SUB);
-		case 0x7D -> readPrimMath(in, method, JVMType.LONG, JVMMath.SHIFT_LOGIC_RIGTH);
-		case 0x83 -> readPrimMath(in, method, JVMType.LONG, JVMMath.XOR);
-		case 0xC2 -> readMonitorEnter(in, method);
-		case 0xC3 -> readMonitorExit(in, method);
-		case 0xC5 -> readMultiNewArray(in, method);
+		case 0xB9 -> readInvokeInterface(in, method);
+		case 0xBA -> readInvokeDynamic(in, method);
 		case 0xBB -> readNew(in, method);
 		case 0xBC -> readNewArray(in, method, false); // primitive array
-		case 0x00 -> readNOP(in, method);
-		case 0x57, 0x58 -> readPOP(in, method, b - 0x56); // 1 or 2 pop operations
-		case 0xB5 -> readSetField(in, method);
-		case 0xB3 -> readSetStaticField(in, method);
-		case 0xA9 -> readRet(in, method, false); // non-wide // maybe just fail (not usable since JavaSE 7, since JSR is not supported)
-		case 0xB1 -> readReturn(in, method, JVMType.VOID);
-		case 0x35 -> readArrayLoad(in, method, JVMType.SHORT);
-		case 0x56 -> readArrayStore(in, method, JVMType.SHORT);
-		case 0x11 -> readPush(in, method, JVMType.SHORT);
-		case 0x5F -> readSwap(in, method);
-		case 0xAA -> readTableSwitch(in, method);
+		case 0xBD -> readNewArray(in, method, true); // reference array
+		case 0xBE -> readArrayLength(in, method);
+		case 0xBF -> readAThrow(in, method);
+		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
+		};
+	}
+	
+	private static JCommand readCommandC(AlignableDataInput in, JMethod method, int b) throws IOException {
+		return switch (b) {
+		case 0xC0 -> readCheckCast(in, method, true);
+		case 0xC1 -> readCheckCast(in, method, false);
+		case 0xC2 -> readMonitorEnter(in, method);
+		case 0xC3 -> readMonitorExit(in, method);
 		case 0xC4 -> readWide(in, method);
+		case 0xC5 -> readMultiNewArray(in, method);
+		case 0xC6 -> readSign(in, method, JVMType.REFERENCE, JVMCmp.EQUAL);
+		case 0xC7 -> readSign(in, method, JVMType.REFERENCE, JVMCmp.NOT_EQUAL);
+		case 0xC8 -> readGoto(in, method, true); // wide
+		case 0xC9 -> readJSR(in, method, b); // maybe just fail (not supported since JavaSE 7)
 		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
 		};
 	}
@@ -333,12 +561,13 @@ public class ClassReader {
 	
 	@SuppressWarnings("unused")
 	private static JCommand readIInc(AlignableDataInput in, JMethod method, boolean wide) throws IOException {
-		int index = wide ? in.readUnsignedShort() : in.readUnsignedByte();
+		int index    = wide ? in.readUnsignedShort() : in.readUnsignedByte();
 		int addConst = wide ? in.readShort() : in.readByte();
 		return new JCommand.IInc(index, addConst);
 	}
 	
-	private static JCommand readCheckCast(AlignableDataInput in, JMethod method, boolean fail) throws IOException { // fail = false -> instanceof (null is handled differently!)
+	private static JCommand readCheckCast(AlignableDataInput in, JMethod method, boolean fail) throws IOException { // fail = false -> instanceof (null is handled
+																													// differently!)
 		JType type = method.file.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type();
 		return new JCommand.CheckCast(type, fail);
 	}
@@ -386,54 +615,110 @@ public class ClassReader {
 		return new JCommand.SimpleCommand(SimpleCommands.LONG_COMPARE);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readConst(AlignableDataInput in, JMethod method, JVMType type, long value) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.Const(type, value);
 	}
 	
-	private static JCommand readLoadConstPool(AlignableDataInput in, JMethod method, boolean wide, int constSize) { // 2 for double/long ||| 1 for other types
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	private static JCommand readLoadConstPool(AlignableDataInput in, JMethod method, boolean wide, int constSize) throws IOException {
+		// 2 for double/long ||| 1 for other types
+		int     index = wide ? in.readUnsignedShort() : in.readUnsignedByte();
+		CPEntry entry = method.file.cp(CPEntry.class, index);
+		if (!((constSize == 1 && (//
+		/*		*/ entry instanceof CPEntry.CPEInt //
+				|| entry instanceof CPEntry.CPEFloat //
+				|| entry instanceof CPEntry.CPEString //
+				|| entry instanceof CPEntry.CPEClass //
+				|| entry instanceof CPEntry.CPEDynamic //
+				|| entry instanceof CPEntry.CPEMethodType//
+				|| entry instanceof CPEntry.CPEMethodHandle//
+		)) || (constSize == 2 && (//
+		/*		*/ entry instanceof CPEntry.CPELong//
+				|| entry instanceof CPEntry.CPEDouble//
+				|| entry instanceof CPEntry.CPEDynamic//
+		)))) {
+			throw new ClassFormatError("invalid type of class path entry for ldc operation");
+		}
+		if (entry instanceof CPEntry.CPEDynamic d) {
+			CPENameAndType nt       = method.file.cp(CPEntry.CPENameAndType.class, d.nameAndTypeIndex());
+			boolean        twoSized = nt.type() == JType.JPrimType.LONG || nt.type() == JType.JPrimType.DOUBLE;
+			if ((constSize == 1 && twoSized) || (constSize == 2 && !twoSized)) {
+				throw new ClassFormatError("invalid type of dynamic class path entry for ldc operation");
+			}
+		}
+		return new JCommand.LoadConstPool(entry);
 	}
 	
-	private static JCommand readLocalLoad(AlignableDataInput in, JMethod method, JVMType type, int index, boolean wide) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	@SuppressWarnings("unused")
+	private static JCommand readLocalLoad(AlignableDataInput in, JMethod method, JVMType type, int index, boolean wide) throws IOException {
+		if (index == -1) {
+			index = wide ? in.readUnsignedShort() : in.readUnsignedByte();
+		}
+		return new JCommand.LocalLoad(type, index);
 	}
 	
-	private static JCommand readLookupSwitch(AlignableDataInput in, JMethod method) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	@SuppressWarnings("unused")
+	private static JCommand readLookupSwitch(AlignableDataInput in, JMethod method) throws IOException {
+		in.align(4);
+		int defaultAddress = in.readInt();
+		// the method can be at max 2^32 byte large
+		// each pair consist of a 4 byte int value and a 4 byte offset
+		// so the most significant bit of the value must be zero
+		final int npairs  = in.readInt();
+		int[]     matchs  = new int[npairs];
+		int[]     offsets = new int[npairs];
+		for (int i = 0; i < npairs; i++) {
+			matchs[i]  = in.readInt();
+			offsets[i] = in.readInt();
+		}
+		return new JCommand.LookupSwitch(defaultAddress, matchs, offsets);
 	}
 	
-	private static JCommand readLocalStore(AlignableDataInput in, JMethod method, JVMType reference, int index, boolean wide) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	@SuppressWarnings("unused")
+	private static JCommand readLocalStore(AlignableDataInput in, JMethod method, JVMType type, int index, boolean wide) throws IOException {
+		if (index == -1) {
+			index = wide ? in.readUnsignedShort() : in.readUnsignedByte();
+		}
+		return new JCommand.LocalStore(type, index);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readPrimMath(AlignableDataInput in, JMethod method, JVMType type, JVMMath op) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.PrimMath(type, op);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readMonitorEnter(AlignableDataInput in, JMethod method) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.SimpleCommand(SimpleCommands.MONITOR_ENTER);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readMonitorExit(AlignableDataInput in, JMethod method) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.SimpleCommand(SimpleCommands.MONITOR_EXIT);
 	}
 	
-	private static JCommand readMultiNewArray(AlignableDataInput in, JMethod method) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	private static JCommand readMultiNewArray(AlignableDataInput in, JMethod method) throws IOException {
+		JType type       = method.file.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type();
+		int   dimensions = in.readUnsignedByte();
+		if (dimensions == 0) {
+			throw new ClassFormatError("multi new array with zero array dimesions");
+		}
+		JType t = type;
+		for (int need = dimensions; need > 0; need--) {
+			if (!(t instanceof JType.ArrayType at)) {
+				throw new ClassFormatError("multi new array on a type with a too less array dimesions");
+			}
+			t = at;
+		}
+		return new JCommand.MultiNewArray(type, dimensions);
 	}
 	
-	private static JCommand readNew(AlignableDataInput in, JMethod method) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	private static JCommand readNew(AlignableDataInput in, JMethod method) throws IOException {
+		JType type = method.file.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type();
+		if (!(type instanceof JType.ObjectType)) {
+			throw new ClassFormatError("new on a non object type (array types are also forbidden)");
+		}
+		return new JCommand.New(type);
 	}
 	
 	@SuppressWarnings("unused")
@@ -441,15 +726,17 @@ public class ClassReader {
 		return new JCommand.SimpleCommand(SimpleCommands.NOP);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readPOP(AlignableDataInput in, JMethod method, int pops) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.SimpleCommand(SimpleCommands.POP);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readSetField(AlignableDataInput in, JMethod method) {
 		return new JCommand.SimpleCommand(SimpleCommands.SET_FIELD);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readSetStaticField(AlignableDataInput in, JMethod method) {
 		return new JCommand.SimpleCommand(SimpleCommands.SET_STATIC_FIELD);
 	}
@@ -459,34 +746,61 @@ public class ClassReader {
 		throw new InternalError("I do not support ret, jsr, jsr_w, wide ret");
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readReturn(AlignableDataInput in, JMethod method, JVMType type) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.Return(type);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readArrayLoad(AlignableDataInput in, JMethod method, JVMType type) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.ArrayLoad(type);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readArrayStore(AlignableDataInput in, JMethod method, JVMType type) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.ArrayStore(type);
 	}
 	
-	private static JCommand readPush(AlignableDataInput in, JMethod method, JVMType type) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	@SuppressWarnings("unused")
+	private static JCommand readPush(AlignableDataInput in, JMethod method, JVMType type) throws IOException {
+		int value;
+		int bytes;
+		switch (type) {
+		case BYTE_BOOL:
+			value = in.readUnsignedByte();
+			bytes = 1;
+			break;
+		case SHORT:
+			value = in.readUnsignedShort();
+			bytes = 2;
+			break;
+		// $CASES-OMITTED$
+		default:
+			throw new AssertionError();
+		}
+		return new JCommand.Push(bytes, value);
 	}
 	
+	@SuppressWarnings("unused")
 	private static JCommand readSwap(AlignableDataInput in, JMethod method) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		return new JCommand.SimpleCommand(SimpleCommands.SWAP);
 	}
 	
-	private static JCommand readTableSwitch(AlignableDataInput in, JMethod method) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	@SuppressWarnings("unused")
+	private static JCommand readTableSwitch(AlignableDataInput in, JMethod method) throws IOException {
+		in.align(4);
+		int defaultOffset = in.readInt();
+		int minValue      = in.readInt();
+		int maxValue      = in.readInt();
+		// the method can be at max 2^32 byte large
+		// each entry consist of a 4 byte offset
+		// so the most significant bit of the length must be zero
+		final int length  = maxValue - minValue + 1;
+		int[]     offsets = new int[length];
+		for (int i = 0; i < length; i++) {
+			offsets[i] = in.readInt();
+		}
+		return new JCommand.TableSwitch(defaultOffset, minValue, maxValue, offsets);
 	}
 	
 	private static JCommand readWide(AlignableDataInput in, JMethod method) throws IOException {
@@ -606,7 +920,7 @@ public class ClassReader {
 	private static void finishCPEntry(int minor, int major, CPEntry cpe, ClassFile f) throws IOException {
 		if (cpe instanceof CPEntry.CPEClass e) {
 			CPEntry.CPEUtf8 u8 = f.cp(CPEntry.CPEUtf8.class, e.nameIndex);
-			JType   t  = readType(u8.val(), false);
+			JType           t  = readType(u8.val(), false);
 			e.initType(t);
 		} else if (cpe instanceof CPEntry.CPEFieldRef fr) {
 			CPEntry.CPEClass       t  = f.cp(CPEntry.CPEClass.class, fr.classIndex);

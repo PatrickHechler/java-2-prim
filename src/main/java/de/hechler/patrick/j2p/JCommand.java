@@ -1,6 +1,7 @@
 package de.hechler.patrick.j2p;
 
 import de.hechler.patrick.j2p.ClassReader.JVMCmp;
+import de.hechler.patrick.j2p.ClassReader.JVMMath;
 import de.hechler.patrick.j2p.ClassReader.JVMType;
 
 @SuppressWarnings("javadoc")
@@ -113,6 +114,36 @@ public abstract sealed class JCommand {
 		
 	}
 	
+	public static final class LookupSwitch extends JCommand {
+		
+		public final int   defaultOffset;
+		public final int[] matches;
+		public final int[] offsets;
+		
+		public LookupSwitch(int defaultOffset, int[] matches, int[] offsets) {
+			this.defaultOffset = defaultOffset;
+			this.matches       = matches;
+			this.offsets       = offsets;
+		}
+		
+	}
+	
+	public static final class TableSwitch extends JCommand {
+		
+		public final int   defaultOffset;
+		public final int   minValue;
+		public final int   maxValue;
+		public final int[] offsets;
+		
+		public TableSwitch(int defaultOffset, int minValue, int maxValue, int[] offsets) {
+			this.defaultOffset = defaultOffset;
+			this.minValue      = minValue;
+			this.maxValue      = maxValue;
+			this.offsets       = offsets;
+		}
+		
+	}
+	
 	public static final class Convert extends JCommand {
 		
 		public final JVMType from;
@@ -133,6 +164,128 @@ public abstract sealed class JCommand {
 		public CheckCast(JType type, boolean fail) {
 			this.type = type;
 			this.fail = fail;
+		}
+		
+	}
+	
+	public static final class Const extends JCommand {
+		
+		public final JVMType type;
+		public final long    value;
+		
+		public Const(JVMType type, long value) {
+			this.type  = type;
+			this.value = value;
+		}
+		
+	}
+	
+	public static final class LocalLoad extends JCommand {
+		
+		public final JVMType type;
+		public final int     index;
+		
+		public LocalLoad(JVMType type, int index) {
+			this.type  = type;
+			this.index = index;
+		}
+		
+	}
+	
+	public static final class LocalStore extends JCommand {
+		
+		public final JVMType type;
+		public final int     index;
+		
+		public LocalStore(JVMType type, int index) {
+			this.type  = type;
+			this.index = index;
+		}
+		
+	}
+	
+	public static final class PrimMath extends JCommand {
+		
+		public final JVMType type;
+		public final JVMMath op;
+		
+		public PrimMath(JVMType type, JVMMath op) {
+			this.type = type;
+			this.op   = op;
+		}
+		
+	}
+	
+	public static final class MultiNewArray extends JCommand {
+		
+		public final JType type;
+		public final int   dimensions;
+		
+		public MultiNewArray(JType type, int dimensions) {
+			this.type       = type;
+			this.dimensions = dimensions;
+		}
+		
+	}
+	
+	public static final class Push extends JCommand {
+		
+		public final int bytes;
+		public final int value;
+		
+		public Push(int bytes, int value) {
+			this.bytes = bytes;
+			this.value = value;
+		}
+		
+	}
+	
+	public static final class New extends JCommand {
+		
+		public final JType type;
+		
+		public New(JType type) {
+			this.type = type;
+		}
+		
+	}
+	
+	public static final class Return extends JCommand {
+		
+		public final JVMType type;
+		
+		public Return(JVMType type) {
+			this.type = type;
+		}
+		
+	}
+	
+	public static final class ArrayLoad extends JCommand {
+		
+		public final JVMType type;
+		
+		public ArrayLoad(JVMType type) {
+			this.type = type;
+		}
+		
+	}
+	
+	public static final class ArrayStore extends JCommand {
+		
+		public final JVMType type;
+		
+		public ArrayStore(JVMType type) {
+			this.type = type;
+		}
+		
+	}
+	
+	public static final class LoadConstPool extends JCommand {
+		
+		public final CPEntry entry;
+		
+		public LoadConstPool(CPEntry entry) {
+			this.entry = entry;
 		}
 		
 	}
@@ -173,8 +326,10 @@ public abstract sealed class JCommand {
 		GET_FIELD, GET_STATIC_FIELD, SET_FIELD, SET_STATIC_FIELD,
 		// class checking
 		CHECK_CASTS, INSTANCE_OF,
+		// synchronizing
+		MONITOR_ENTER, MONITOR_EXIT,
 		// miscellaneous
-		ARRAY_LENGTH, A_THROW, LONG_COMPARE, NOP
+		ARRAY_LENGTH, A_THROW, LONG_COMPARE, NOP, POP, SWAP,
 	
 	}
 	

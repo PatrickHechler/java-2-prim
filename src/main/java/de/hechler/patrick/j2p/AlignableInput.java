@@ -10,8 +10,7 @@ public class AlignableInput extends InputStream {
 	
 	private final InputStream delegate;
 	private long              address;
-	private long              markAddress = -1L;
-	private long              markEnd     = -1L;
+	private long              markAddress;
 	
 	public AlignableInput(InputStream in) {
 		super();
@@ -49,24 +48,12 @@ public class AlignableInput extends InputStream {
 	
 	@Override
 	public void mark(int readlimit) {
-		if (this.delegate.markSupported()) {
-			this.delegate.mark(readlimit);
-			this.markAddress = this.address;
-			this.markEnd = this.address + readlimit;
-		}
+		this.delegate.mark(readlimit);
+		this.markAddress = this.address;
 	}
 	
 	@Override
 	public void reset() throws IOException {
-		if (!this.delegate.markSupported()) {
-			throw new IOException("no mark supported");
-		}
-		if (this.markAddress == -1) {
-			throw new IOException("no mark set");
-		}
-		if (this.markEnd > this.address) {
-			throw new IOException("the mark invalid (too much was read since the mark)");
-		}
 		this.delegate.reset();
 		this.address = this.markAddress;
 	}
