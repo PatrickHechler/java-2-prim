@@ -1,6 +1,5 @@
 package de.hechler.patrick.j2p.parse;
 
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -51,7 +50,7 @@ public class JMethod {
 			throw new AssertionError();
 		}
 		List<JSMEVerificationInfo> locals = new ArrayList<>();
-		if ((this.accessFlags & Modifier.STATIC) == 0) {
+		if ((this.accessFlags & Modifier.ACC_STATIC) == 0) {
 			if ("<init>".equals(this.name)) {
 				locals.add(JSMEVerificationInfo.SimpleInfo.UNINITIALIZEDTHIS);
 			} else {
@@ -84,7 +83,7 @@ public class JMethod {
 	
 	
 	public void finish() {
-		if (this.stackMapEntries == null && (this.accessFlags & Modifier.ABSTRACT) == 0) {
+		if (this.stackMapEntries == null && (this.accessFlags & Modifier.ACC_ABSTRACT) == 0) {
 			initStackMapTable(new JStackMapEntry[1]);
 		}
 	}
@@ -114,7 +113,7 @@ public class JMethod {
 		String        nl = System.lineSeparator();
 		StringBuilder b  = new StringBuilder();
 		b.append("accessFlags: ").append(this.accessFlags).append(" : 0x").append(Integer.toHexString(this.accessFlags)).append(" : ")
-				.append(Modifier.toString(this.accessFlags));
+				.append(Modifier.methodString(this.accessFlags));
 		if (this.name != null) {
 			b.append(" name=").append(this.name);
 		}

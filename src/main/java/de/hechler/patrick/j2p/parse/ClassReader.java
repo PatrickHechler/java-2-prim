@@ -96,7 +96,7 @@ public class ClassReader {
 			for (int ai = 0; ai < alen; ai++) {
 				String attrName = f.cp(CPEntry.CPEUtf8.class, in.readUnsignedShort()).val();
 				if ("Code".equals(attrName)) {
-					readCodeAttribute(in, f, i, method);
+					readCodeAttribute(in, f, method);
 				} else {
 					skipAttribute(in);
 				}
@@ -107,7 +107,7 @@ public class ClassReader {
 		f.init3(mets);
 	}
 	
-	private static void readCodeAttribute(AlignableDataInput in, ClassFile f, int i, JMethod method) throws IOException, ClassFormatError {
+	private static void readCodeAttribute(AlignableDataInput in, ClassFile f, JMethod method) throws IOException, ClassFormatError {
 		in.readInt();
 		int        maxStack  = in.readUnsignedShort();
 		int        maxLocals = in.readUnsignedShort();
@@ -145,31 +145,31 @@ public class ClassReader {
 				for (int smti = 1; smti < smtLen; smti++) {
 					int smfTag = in.readUnsignedByte();
 					if (smfTag <= 63) {
-						entries[i] = new JStackMapEntry.SameLocalsNewStack(smfTag);
+						entries[smti] = new JStackMapEntry.SameLocalsNewStack(smfTag);
 					} else if (smfTag <= 127) {
 						JSMEVerificationInfo[] vis = readVerificationInfos(in, f, 1);
-						entries[i] = new JStackMapEntry.SameLocalsNewStack(smfTag - 64, vis);
+						entries[smti] = new JStackMapEntry.SameLocalsNewStack(smfTag - 64, vis);
 					} else if (smfTag <= 246) {
 						throw new ClassFormatError("the stack map table tags [128-246] are reserved for future use");
 					} else if (smfTag == 247) {
 						int                    offsetDelta = in.readUnsignedShort();
 						JSMEVerificationInfo[] vis         = readVerificationInfos(in, f, 1);
-						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, vis);
+						entries[smti] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, vis);
 					} else if (smfTag <= 250) {
 						int offsetDelta = in.readUnsignedShort();
-						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, JStackMapEntry.EMPTY_ARRAY, 251 - smfTag);
+						entries[smti] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, JStackMapEntry.EMPTY_ARRAY, 251 - smfTag);
 					} else if (smfTag == 251) {
 						int offsetDelta = in.readUnsignedShort();
-						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta);
+						entries[smti] = new JStackMapEntry.SameLocalsNewStack(offsetDelta);
 					} else if (smfTag <= 254) {
 						int                    offsetDelta = in.readUnsignedShort();
 						JSMEVerificationInfo[] vis         = readVerificationInfos(in, f, smfTag - 251);
-						entries[i] = new JStackMapEntry.AppendedLocalsEmptyStack(offsetDelta, vis);
+						entries[smti] = new JStackMapEntry.AppendedLocalsEmptyStack(offsetDelta, vis);
 					} else { // 255 (smfTag is an unsigned byte)
 						int                    offsetDelta = in.readUnsignedShort();
 						JSMEVerificationInfo[] locals      = readVerificationInfos(in, f, in.readUnsignedShort());
 						JSMEVerificationInfo[] stack       = readVerificationInfos(in, f, in.readUnsignedShort());
-						entries[i] = new JStackMapEntry.FullDescribtion(offsetDelta, locals, stack);
+						entries[smti] = new JStackMapEntry.FullDescribtion(offsetDelta, locals, stack);
 					}
 				}
 				method.initStackMapTable(entries);
@@ -827,7 +827,7 @@ public class ClassReader {
 			int       accessFlags  = in.readUnsignedShort();
 			String    name         = f.cp(CPEntry.CPEUtf8.class, in.readUnsignedShort()).val();
 			JType     type         = readType(f.cp(CPEntry.CPEUtf8.class, in.readUnsignedShort()).val(), false);
-			Object    initialValue = null;
+			CPEntry   initialValue = null;
 			final int alen         = in.readUnsignedShort();
 			for (int ai = 0; ai < alen; ai++) {
 				String aname = f.cp(CPEntry.CPEUtf8.class, in.readUnsignedShort()).val();
@@ -837,16 +837,12 @@ public class ClassReader {
 					if (initialValue != null) {
 						throw new ClassFormatError("multiple ConstantValue attributes for the same static field");
 					}
-					if (e instanceof CPEntry.CPEInt v) {
-						initialValue = Integer.valueOf(v.val());
-					} else if (e instanceof CPEntry.CPEFloat v) {
-						initialValue = Float.valueOf(v.val());
-					} else if (e instanceof CPEntry.CPELong v) {
-						initialValue = Long.valueOf(v.val());
-					} else if (e instanceof CPEntry.CPEDouble v) {
-						initialValue = Double.valueOf(v.val());
-					} else if (e instanceof CPEntry.CPEString v) {
-						initialValue = v.str();
+					if (/*	*/ e instanceof CPEntry.CPEInt //
+							|| e instanceof CPEntry.CPEFloat //
+							|| e instanceof CPEntry.CPELong //
+							|| e instanceof CPEntry.CPEDouble //
+							|| e instanceof CPEntry.CPEString) {
+						initialValue = e;
 					} else {
 						throw new ClassFormatError(
 								"the class file contains a fild with an invalid constant value type: " + e.getClass().getSimpleName() + " : " + e);

@@ -1,6 +1,5 @@
 package de.hechler.patrick.j2p.parse;
 
-import java.lang.reflect.Modifier;
 import java.util.Set;
 
 @SuppressWarnings("javadoc")
@@ -172,7 +171,7 @@ public class ClassFile {
 			b.append(']').append(nl);
 		}
 		b.append("access_flags: ").append(this.accessFlags).append(" : 0x").append(Integer.toHexString(this.accessFlags)).append(" : ")
-				.append(Modifier.toString(this.accessFlags)).append(nl);
+				.append(Modifier.classString(this.accessFlags)).append(nl);
 		if (this.thisClass != null) {
 			b.append("this_class: ").append(this.thisClass);
 			if (this.superClass == null) b.append(nl);

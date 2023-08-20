@@ -11,7 +11,7 @@ import de.hechler.patrick.j2p.parse.ClassFile;
 import de.hechler.patrick.j2p.parse.ClassReader;
 
 @SuppressWarnings("javadoc")
-public class J2P {
+public class J2PMain {
 	
 	private static final int     MAJOR           = 1;
 	private static final int     MINOR           = 0;
