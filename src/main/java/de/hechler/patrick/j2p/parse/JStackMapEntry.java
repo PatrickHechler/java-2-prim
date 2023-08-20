@@ -1,8 +1,6 @@
 package de.hechler.patrick.j2p.parse;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 @SuppressWarnings("javadoc")
 public sealed interface JStackMapEntry {
@@ -10,28 +8,6 @@ public sealed interface JStackMapEntry {
 	int offsetDelta();
 	
 	static final JSMEVerificationInfo[] EMPTY_ARRAY = new JSMEVerificationInfo[0];
-	
-	public final class FullDescribtionModifiable {
-		
-		private int                             address = 0;
-		public final List<JSMEVerificationInfo> locals  = new ArrayList<>();
-		public final List<JSMEVerificationInfo> stack   = new ArrayList<>();
-		
-		public int address() {
-			return this.address;
-		}
-		
-		public void address(int address) {
-			this.address = address;
-		}
-		
-		
-		public int incrementAddress(int offsetDelta) {
-			this.address += offsetDelta;
-			return this.address;
-		}
-		
-	}
 	
 	public record FullDescribtion(int offsetDelta, JSMEVerificationInfo[] locals, JSMEVerificationInfo[] stack) implements JStackMapEntry {
 		
