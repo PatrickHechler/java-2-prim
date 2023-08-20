@@ -1,11 +1,13 @@
 # Java-2-Prim
+the [Method call](#Method_call) section describes how natives code has to invoke java code, how native code is invoked and how java code invokes other java methods.    
+the [Method excecution](#Method_excecution) section describes how java methods are executed.    
 ## Method call
 ### JNI Argument
 #### Java code calls
 the _JNI-Env_ pointer is passed in the `X1F` register    
-+ if a non-`native` method is invoked, the _JNI-Env_ pointer also has to be stored in the `X1F` register when the method returns
-+ otherwise _pvm-java_ sets the `X1F` register to the _JNI-Env_ pointer after the native code returns
++ if a `native` method is invoked _pvm-java_ sets the `X1F` register to the _JNI-Env_ pointer after the native code returns
 	+ the native code __must__ not modify the _JNI-Env_ pointers target/content
++ otherwise the _JNI-Env_ pointer also has to be stored in the `X1F` register when the method returns
 #### native code calls java code
 _pvm-java_ saves the `X1F` register on the stack and overwrites it with the _JNI-Env_ pointer
 
@@ -24,7 +26,8 @@ if this is not possible (there are more arguments then registers after the `X1F`
 if there are no arguments the first method nothing needs to be done
 ### Return Value
 if there is a return value it is stored in the `X00` register
-## Local Variables
+## Method excecution
+the [Local Variables](#Local_Variables) section describes how the local variables are stored during the execution of an java method.    
+### Local Variables
 they are stored like the [arguments](#arguments)
-also see the [arguments](#java-2-prim)
-[test](https://hechler.de)
+### Operant Stack
