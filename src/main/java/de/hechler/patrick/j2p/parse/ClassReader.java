@@ -1,4 +1,4 @@
-package de.hechler.patrick.j2p;
+package de.hechler.patrick.j2p.parse;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -8,8 +8,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-import de.hechler.patrick.j2p.CPEntry.CPENameAndType;
-import de.hechler.patrick.j2p.JCommand.SimpleCommands;
+import de.hechler.patrick.j2p.parse.CPEntry.CPENameAndType;
+import de.hechler.patrick.j2p.parse.JCommand.SimpleCommands;
 
 @SuppressWarnings("javadoc")
 public class ClassReader {
@@ -100,8 +100,8 @@ public class ClassReader {
 				} else {
 					skipAttribute(in);
 				}
-				method.finish();
 			}
+			method.finish();
 			mets[i] = method;
 		}
 		f.init3(mets);
@@ -126,10 +126,11 @@ public class ClassReader {
 		final int           excepLen = in.readUnsignedShort();
 		JExceptionHandler[] handlers = new JExceptionHandler[excepLen];
 		for (int ei = 0; ei < excepLen; ei++) {
-			int   start   = in.readUnsignedShort();
-			int   end     = in.readUnsignedShort();
-			int   handler = in.readUnsignedShort();
-			JType type    = f.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type();
+			int   start     = in.readUnsignedShort();
+			int   end       = in.readUnsignedShort();
+			int   handler   = in.readUnsignedShort();
+			int   typeIndex = in.readUnsignedShort();
+			JType type      = typeIndex == 0 ? null : f.cp(CPEntry.CPEClass.class, typeIndex).type();
 			handlers[ei] = new JExceptionHandler(start, end, handler, type);
 		}
 		method.initHandlers(handlers);
@@ -155,9 +156,8 @@ public class ClassReader {
 						JSMEVerificationInfo[] vis         = readVerificationInfos(in, f, 1);
 						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, vis);
 					} else if (smfTag <= 250) {
-						int                    offsetDelta = in.readUnsignedShort();
-						JSMEVerificationInfo[] vis         = readVerificationInfos(in, f, 1);
-						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, vis, 251 - smfTag);
+						int offsetDelta = in.readUnsignedShort();
+						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta, JStackMapEntry.EMPTY_ARRAY, 251 - smfTag);
 					} else if (smfTag == 251) {
 						int offsetDelta = in.readUnsignedShort();
 						entries[i] = new JStackMapEntry.SameLocalsNewStack(offsetDelta);
@@ -187,12 +187,12 @@ public class ClassReader {
 			case 0 -> JSMEVerificationInfo.SimpleInfo.TOP;
 			case 1 -> JSMEVerificationInfo.SimpleInfo.INTEGER;
 			case 2 -> JSMEVerificationInfo.SimpleInfo.FLOAT;
+			case 3 -> JSMEVerificationInfo.SimpleInfo.DOUBLE;
+			case 4 -> JSMEVerificationInfo.SimpleInfo.LONG;
 			case 5 -> JSMEVerificationInfo.SimpleInfo.NULL;
 			case 6 -> JSMEVerificationInfo.SimpleInfo.UNINITIALIZEDTHIS;
 			case 7 -> new JSMEVerificationInfo.ObjectInfo(f.cp(CPEntry.CPEClass.class, in.readUnsignedShort()).type());
 			case 8 -> new JSMEVerificationInfo.UninitilizedInfo(in.readUnsignedShort());
-			case 4 -> JSMEVerificationInfo.SimpleInfo.LONG;
-			case 3 -> JSMEVerificationInfo.SimpleInfo.DOUBLE;
 			default -> throw new ClassFormatError("invalid verification_type_info tag: " + vtiTag);
 			};
 		}
@@ -276,23 +276,23 @@ public class ClassReader {
 		case 0x12 -> readLoadConstPool(in, method, false, 1);
 		case 0x13 -> readLoadConstPool(in, method, true, 1);
 		case 0x14 -> readLoadConstPool(in, method, true, 2);
-		case 0x15 -> readLocalLoad(in, method, JVMType.INT, -1, false); // modifiable by wide
-		case 0x16 -> readLocalLoad(in, method, JVMType.LONG, -1, false); // modifiable by wide
-		case 0x17 -> readLocalLoad(in, method, JVMType.FLOAT, -1, false); // modifiable by wide
-		case 0x18 -> readLocalLoad(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
-		case 0x19 -> readLocalLoad(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
-		case 0x1A, 0x1B, 0x1C, 0x1D -> readLocalLoad(in, method, JVMType.FLOAT, b - 0x1A, false);
-		case 0x1E, 0x1F -> readLocalLoad(in, method, JVMType.LONG, b - 0x1E, false);
+		case 0x15 -> readLocalVariableLoad(in, method, JVMType.INT, -1, false); // modifiable by wide
+		case 0x16 -> readLocalVariableLoad(in, method, JVMType.LONG, -1, false); // modifiable by wide
+		case 0x17 -> readLocalVariableLoad(in, method, JVMType.FLOAT, -1, false); // modifiable by wide
+		case 0x18 -> readLocalVariableLoad(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
+		case 0x19 -> readLocalVariableLoad(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
+		case 0x1A, 0x1B, 0x1C, 0x1D -> readLocalVariableLoad(in, method, JVMType.FLOAT, b - 0x1A, false);
+		case 0x1E, 0x1F -> readLocalVariableLoad(in, method, JVMType.LONG, b - 0x1E, false);
 		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
 		};
 	}
 	
 	private static JCommand readCommand2(AlignableDataInput in, JMethod method, int b) throws IOException {
 		return switch (b) {
-		case 0x20, 0x21 -> readLocalLoad(in, method, JVMType.LONG, b - 0x1E, false);
-		case 0x22, 0x23, 0x24, 0x25 -> readLocalLoad(in, method, JVMType.FLOAT, b - 0x22, false);
-		case 0x26, 0x27, 0x28, 0x29 -> readLocalLoad(in, method, JVMType.DOUBLE, b - 0x26, false);
-		case 0x2A, 0x2B, 0x2C, 0x2D -> readLocalLoad(in, method, JVMType.REFERENCE, b - 0x2A, false);
+		case 0x20, 0x21 -> readLocalVariableLoad(in, method, JVMType.LONG, b - 0x1E, false);
+		case 0x22, 0x23, 0x24, 0x25 -> readLocalVariableLoad(in, method, JVMType.FLOAT, b - 0x22, false);
+		case 0x26, 0x27, 0x28, 0x29 -> readLocalVariableLoad(in, method, JVMType.DOUBLE, b - 0x26, false);
+		case 0x2A, 0x2B, 0x2C, 0x2D -> readLocalVariableLoad(in, method, JVMType.REFERENCE, b - 0x2A, false);
 		case 0x2E -> readArrayLoad(in, method, JVMType.INT);
 		case 0x2F -> readArrayLoad(in, method, JVMType.LONG);
 		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
@@ -307,23 +307,23 @@ public class ClassReader {
 		case 0x33 -> readArrayLoad(in, method, JVMType.BYTE_BOOL);
 		case 0x34 -> readArrayLoad(in, method, JVMType.CHAR);
 		case 0x35 -> readArrayLoad(in, method, JVMType.SHORT);
-		case 0x36 -> readLocalStore(in, method, JVMType.INT, -1, false); // modifiable by wide
-		case 0x37 -> readLocalStore(in, method, JVMType.LONG, -1, false); // modifiable by wide
-		case 0x38 -> readLocalStore(in, method, JVMType.FLOAT, -1, false); // modifiable by wide
-		case 0x39 -> readLocalStore(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
-		case 0x3A -> readLocalStore(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
-		case 0x3B, 0x3C, 0x3D, 0x3E -> readLocalStore(in, method, JVMType.INT, b - 0x3B, false);
-		case 0x3F -> readLocalStore(in, method, JVMType.REFERENCE, b - 0x3F, false);
+		case 0x36 -> readLocalVariableStore(in, method, JVMType.INT, -1, false); // modifiable by wide
+		case 0x37 -> readLocalVariableStore(in, method, JVMType.LONG, -1, false); // modifiable by wide
+		case 0x38 -> readLocalVariableStore(in, method, JVMType.FLOAT, -1, false); // modifiable by wide
+		case 0x39 -> readLocalVariableStore(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
+		case 0x3A -> readLocalVariableStore(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
+		case 0x3B, 0x3C, 0x3D, 0x3E -> readLocalVariableStore(in, method, JVMType.INT, b - 0x3B, false);
+		case 0x3F -> readLocalVariableStore(in, method, JVMType.REFERENCE, b - 0x3F, false);
 		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
 		};
 	}
 	
 	private static JCommand readCommand4(AlignableDataInput in, JMethod method, int b) throws IOException {
 		return switch (b) {
-		case 0x40, 0x41, 0x42 -> readLocalStore(in, method, JVMType.REFERENCE, b - 0x3F, false);
-		case 0x43, 0x44, 0x45, 0x46 -> readLocalStore(in, method, JVMType.FLOAT, b - 0x43, false);
-		case 0x47, 0x48, 0x49, 0x4A -> readLocalStore(in, method, JVMType.DOUBLE, b - 0x47, false);
-		case 0x4B, 0x4C, 0x4D, 0x4E -> readLocalStore(in, method, JVMType.REFERENCE, b - 0x4B, false);
+		case 0x40, 0x41, 0x42 -> readLocalVariableStore(in, method, JVMType.REFERENCE, b - 0x3F, false);
+		case 0x43, 0x44, 0x45, 0x46 -> readLocalVariableStore(in, method, JVMType.FLOAT, b - 0x43, false);
+		case 0x47, 0x48, 0x49, 0x4A -> readLocalVariableStore(in, method, JVMType.DOUBLE, b - 0x47, false);
+		case 0x4B, 0x4C, 0x4D, 0x4E -> readLocalVariableStore(in, method, JVMType.REFERENCE, b - 0x4B, false);
 		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
 		};
 	}
@@ -422,12 +422,12 @@ public class ClassReader {
 		case 0x96 -> readFPCompare(in, method, JVMType.FLOAT, 1);
 		case 0x97 -> readFPCompare(in, method, JVMType.DOUBLE, -1);
 		case 0x98 -> readFPCompare(in, method, JVMType.DOUBLE, 1);
-		case 0x99 -> readSign(in, method, JVMType.INT, JVMCmp.EQUAL);
-		case 0x9A -> readSign(in, method, JVMType.INT, JVMCmp.NOT_EQUAL);
-		case 0x9B -> readSign(in, method, JVMType.INT, JVMCmp.LOWER);
-		case 0x9C -> readSign(in, method, JVMType.INT, JVMCmp.GREATER_EQUAL);
-		case 0x9D -> readSign(in, method, JVMType.INT, JVMCmp.GREATER);
-		case 0x9E -> readSign(in, method, JVMType.INT, JVMCmp.LOWER_EQUAL);
+		case 0x99 -> readSignCheck(in, method, JVMType.INT, JVMCmp.EQUAL);
+		case 0x9A -> readSignCheck(in, method, JVMType.INT, JVMCmp.NOT_EQUAL);
+		case 0x9B -> readSignCheck(in, method, JVMType.INT, JVMCmp.LOWER);
+		case 0x9C -> readSignCheck(in, method, JVMType.INT, JVMCmp.GREATER_EQUAL);
+		case 0x9D -> readSignCheck(in, method, JVMType.INT, JVMCmp.GREATER);
+		case 0x9E -> readSignCheck(in, method, JVMType.INT, JVMCmp.LOWER_EQUAL);
 		case 0x9F -> readCompare(in, method, JVMType.INT, JVMCmp.EQUAL);
 		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
 		};
@@ -462,7 +462,7 @@ public class ClassReader {
 		case 0xB2 -> readGetStaticField(in, method);
 		case 0xB3 -> readSetStaticField(in, method);
 		case 0xB4 -> readGetField(in, method);
-		case 0xB5 -> readSetField(in, method);
+		case 0xB5 -> readPutField(in, method);
 		case 0xB6 -> readInvokeVirtual(in, method);
 		case 0xB7 -> readInvokeSpecial(in, method);
 		case 0xB8 -> readInvokeStatic(in, method);
@@ -485,8 +485,8 @@ public class ClassReader {
 		case 0xC3 -> readMonitorExit(in, method);
 		case 0xC4 -> readWide(in, method);
 		case 0xC5 -> readMultiNewArray(in, method);
-		case 0xC6 -> readSign(in, method, JVMType.REFERENCE, JVMCmp.EQUAL);
-		case 0xC7 -> readSign(in, method, JVMType.REFERENCE, JVMCmp.NOT_EQUAL);
+		case 0xC6 -> readSignCheck(in, method, JVMType.REFERENCE, JVMCmp.EQUAL);
+		case 0xC7 -> readSignCheck(in, method, JVMType.REFERENCE, JVMCmp.NOT_EQUAL);
 		case 0xC8 -> readGoto(in, method, true); // wide
 		case 0xC9 -> readJSR(in, method, b); // maybe just fail (not supported since JavaSE 7)
 		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
@@ -534,14 +534,12 @@ public class ClassReader {
 		return new JCommand.StackDup(skip, dupCnt);
 	}
 	
-	@SuppressWarnings("unused")
-	private static JCommand readGetField(AlignableDataInput in, JMethod method) {
-		return new JCommand.SimpleCommand(SimpleCommands.GET_FIELD);
+	private static JCommand readGetField(AlignableDataInput in, JMethod method) throws IOException {
+		return new JCommand.GetField(true, method.file.cp(CPEntry.CPEFieldRef.class, in.readUnsignedShort()));
 	}
 	
-	@SuppressWarnings("unused")
-	private static JCommand readGetStaticField(AlignableDataInput in, JMethod method) {
-		return new JCommand.SimpleCommand(SimpleCommands.GET_STATIC_FIELD);
+	private static JCommand readGetStaticField(AlignableDataInput in, JMethod method) throws IOException {
+		return new JCommand.GetField(false, method.file.cp(CPEntry.CPEFieldRef.class, in.readUnsignedShort()));
 	}
 	
 	@SuppressWarnings("unused")
@@ -555,8 +553,8 @@ public class ClassReader {
 	}
 	
 	@SuppressWarnings("unused")
-	private static JCommand readSign(AlignableDataInput in, JMethod method, JVMType type, JVMCmp cmp) throws IOException {
-		return new JCommand.Sign(in.readUnsignedShort(), type, cmp);
+	private static JCommand readSignCheck(AlignableDataInput in, JMethod method, JVMType type, JVMCmp cmp) throws IOException {
+		return new JCommand.SignCheck(in.readUnsignedShort(), type, cmp);
 	}
 	
 	@SuppressWarnings("unused")
@@ -650,11 +648,11 @@ public class ClassReader {
 	}
 	
 	@SuppressWarnings("unused")
-	private static JCommand readLocalLoad(AlignableDataInput in, JMethod method, JVMType type, int index, boolean wide) throws IOException {
+	private static JCommand readLocalVariableLoad(AlignableDataInput in, JMethod method, JVMType type, int index, boolean wide) throws IOException {
 		if (index == -1) {
 			index = wide ? in.readUnsignedShort() : in.readUnsignedByte();
 		}
-		return new JCommand.LocalLoad(type, index);
+		return new JCommand.LocalVariableLoad(type, index);
 	}
 	
 	@SuppressWarnings("unused")
@@ -675,11 +673,11 @@ public class ClassReader {
 	}
 	
 	@SuppressWarnings("unused")
-	private static JCommand readLocalStore(AlignableDataInput in, JMethod method, JVMType type, int index, boolean wide) throws IOException {
+	private static JCommand readLocalVariableStore(AlignableDataInput in, JMethod method, JVMType type, int index, boolean wide) throws IOException {
 		if (index == -1) {
 			index = wide ? in.readUnsignedShort() : in.readUnsignedByte();
 		}
-		return new JCommand.LocalStore(type, index);
+		return new JCommand.LocalVariableStore(type, index);
 	}
 	
 	@SuppressWarnings("unused")
@@ -731,14 +729,12 @@ public class ClassReader {
 		return new JCommand.SimpleCommand(SimpleCommands.POP);
 	}
 	
-	@SuppressWarnings("unused")
-	private static JCommand readSetField(AlignableDataInput in, JMethod method) {
-		return new JCommand.SimpleCommand(SimpleCommands.SET_FIELD);
+	private static JCommand readPutField(AlignableDataInput in, JMethod method) throws IOException {
+		return new JCommand.PutField(true, method.file.cp(CPEntry.CPEFieldRef.class, in.readUnsignedShort()));
 	}
 	
-	@SuppressWarnings("unused")
-	private static JCommand readSetStaticField(AlignableDataInput in, JMethod method) {
-		return new JCommand.SimpleCommand(SimpleCommands.SET_STATIC_FIELD);
+	private static JCommand readSetStaticField(AlignableDataInput in, JMethod method) throws IOException {
+		return new JCommand.PutField(false, method.file.cp(CPEntry.CPEFieldRef.class, in.readUnsignedShort()));
 	}
 	
 	@SuppressWarnings("unused")
@@ -807,16 +803,16 @@ public class ClassReader {
 		int b = in.readUnsignedByte();
 		return switch (b) {
 		// iload, fload, aload, lload, dload, istore, fstore, astore, lstore, dstore, or ret
-		case 0x15 -> readLocalLoad(in, method, JVMType.INT, -1, true);
-		case 0x17 -> readLocalLoad(in, method, JVMType.FLOAT, -1, true);
-		case 0x19 -> readLocalLoad(in, method, JVMType.REFERENCE, -1, true);
-		case 0x16 -> readLocalLoad(in, method, JVMType.LONG, -1, true);
-		case 0x18 -> readLocalLoad(in, method, JVMType.DOUBLE, -1, true);
-		case 0x36 -> readLocalStore(in, method, JVMType.INT, -1, true);
-		case 0x38 -> readLocalStore(in, method, JVMType.FLOAT, -1, true);
-		case 0x3A -> readLocalStore(in, method, JVMType.REFERENCE, -1, true);
-		case 0x37 -> readLocalStore(in, method, JVMType.LONG, -1, true);
-		case 0x39 -> readLocalStore(in, method, JVMType.DOUBLE, -1, true);
+		case 0x15 -> readLocalVariableLoad(in, method, JVMType.INT, -1, true);
+		case 0x17 -> readLocalVariableLoad(in, method, JVMType.FLOAT, -1, true);
+		case 0x19 -> readLocalVariableLoad(in, method, JVMType.REFERENCE, -1, true);
+		case 0x16 -> readLocalVariableLoad(in, method, JVMType.LONG, -1, true);
+		case 0x18 -> readLocalVariableLoad(in, method, JVMType.DOUBLE, -1, true);
+		case 0x36 -> readLocalVariableStore(in, method, JVMType.INT, -1, true);
+		case 0x38 -> readLocalVariableStore(in, method, JVMType.FLOAT, -1, true);
+		case 0x3A -> readLocalVariableStore(in, method, JVMType.REFERENCE, -1, true);
+		case 0x37 -> readLocalVariableStore(in, method, JVMType.LONG, -1, true);
+		case 0x39 -> readLocalVariableStore(in, method, JVMType.DOUBLE, -1, true);
 		case 0xA9 -> readRet(in, method, true);
 		// iinc
 		case 0x84 -> readIInc(in, method, true);
@@ -834,7 +830,7 @@ public class ClassReader {
 			Object    initialValue = null;
 			final int alen         = in.readUnsignedShort();
 			for (int ai = 0; ai < alen; ai++) {
-				String aname = f.cp(CPEntry.CPEUtf8.class, in.readInt()).val();
+				String aname = f.cp(CPEntry.CPEUtf8.class, in.readUnsignedShort()).val();
 				if ((accessFlags & Modifier.STATIC) != 0 && "ConstantValue".equals(aname)) {
 					readInt(in, 2);
 					CPEntry e = f.cp(CPEntry.class, in.readUnsignedShort());
@@ -862,7 +858,6 @@ public class ClassReader {
 			fields[i] = new JField(accessFlags, name, type, initialValue);
 		}
 		f.init2(fields);
-		throw new UnsupportedOperationException();
 	}
 	
 	private static void skipAttribute(AlignableDataInput in) throws IOException {
@@ -919,8 +914,8 @@ public class ClassReader {
 	
 	private static void finishCPEntry(int minor, int major, CPEntry cpe, ClassFile f) throws IOException {
 		if (cpe instanceof CPEntry.CPEClass e) {
-			CPEntry.CPEUtf8 u8 = f.cp(CPEntry.CPEUtf8.class, e.nameIndex);
-			JType           t  = readType(u8.val(), false);
+			String str = f.cp(CPEntry.CPEUtf8.class, e.nameIndex).val();
+			JType  t   = str.charAt(0) == '[' ? readType(str, false) : new JType.ObjectType(str);
 			e.initType(t);
 		} else if (cpe instanceof CPEntry.CPEFieldRef fr) {
 			CPEntry.CPEClass       t  = f.cp(CPEntry.CPEClass.class, fr.classIndex);
@@ -933,13 +928,13 @@ public class ClassReader {
 			CPEntry.CPENameAndType nt = f.cp(CPEntry.CPENameAndType.class, mr.nameAndTypeIndex);
 			finishCPEntry(minor, major, nt, f);
 			finishCPEntry(minor, major, t, f);
-			mr.initVals(t.type(), nt.name(), nt.type());
+			mr.initVals(t.type(), nt.name(), nt.mtype());
 		} else if (cpe instanceof CPEntry.CPEInterfaceMethodRef imr) {
 			CPEntry.CPEClass       t  = f.cp(CPEntry.CPEClass.class, imr.classIndex);
 			CPEntry.CPENameAndType nt = f.cp(CPEntry.CPENameAndType.class, imr.nameAndTypeIndex);
 			finishCPEntry(minor, major, nt, f);
 			finishCPEntry(minor, major, t, f);
-			imr.initVals(t.type(), nt.name(), nt.type());
+			imr.initVals(t.type(), nt.name(), nt.mtype());
 		} else if (cpe instanceof CPEntry.CPEMethodHandle e) {
 			switch (e.refKind) {
 			case 1, 2, 3, 4 -> {
@@ -982,8 +977,14 @@ public class ClassReader {
 			e.initName(f.cp(CPEntry.CPEUtf8.class, e.nameIndex).val());
 		} else if (cpe instanceof CPEntry.CPENameAndType e) {
 			String name = f.cp(CPEntry.CPEUtf8.class, e.nameIndex).val();
-			JType  type = readType(f.cp(CPEntry.CPEUtf8.class, e.typeIndex).val(), false);
-			e.initVals(name, type);
+			String str  = f.cp(CPEntry.CPEUtf8.class, e.typeIndex).val();
+			if (str.lastIndexOf('(') != -1) {
+				MethodType mtype = readMethodType(str);
+				e.initVals(name, mtype);
+			} else {
+				JType type = readType(str, false);
+				e.initVals(name, type);
+			}
 		} else if (cpe instanceof CPEntry.CPEPackage e) {
 			e.initName(f.cp(CPEntry.CPEUtf8.class, e.nameIndex).val());
 		} else if (cpe instanceof CPEntry.CPEString e) {
@@ -1052,15 +1053,7 @@ public class ClassReader {
 			throw new VerifyError(
 					"the name index is outside of the allowed range: 1.." + entries.length + " invalid index = " + nameIndex + " current index = " + i + ")");
 		}
-		CPEntry.CPEClass cls = new CPEntry.CPEClass(nameIndex);
-		if (nameIndex < i) {
-			if (entries[i] instanceof CPEntry.CPEUtf8 u8) {
-				cls.initType(readType(u8.val(), false));
-			} else {
-				throw new VerifyError("this entries name index refers to a non utf8 entry (current index is: " + i + ")");
-			}
-		}
-		return cls;
+		return new CPEntry.CPEClass(nameIndex);
 	}
 	
 	private static CPEntry readCPString(AlignableDataInput in, int minor, int major, CPEntry[] entries, int i) throws IOException {
@@ -1070,15 +1063,7 @@ public class ClassReader {
 			throw new VerifyError(
 					"name index is outside of the allowed range: 1.." + entries.length + " invalid index: " + nameIndex + " the current index is: " + i + ")");
 		}
-		CPEntry.CPEString str = new CPEntry.CPEString(nameIndex);
-		if (nameIndex < i) {
-			if (entries[i] instanceof CPEntry.CPEUtf8 u8) {
-				str.initStr(u8.val());
-			} else {
-				throw new VerifyError("this entries name index refers to a non utf8 entry (current index is: " + i + ")");
-			}
-		}
-		return str;
+		return new CPEntry.CPEString(nameIndex);
 	}
 	
 	private static CPEntry readCPFieldref(AlignableDataInput in, int minor, int major, CPEntry[] entries, int i) throws IOException {

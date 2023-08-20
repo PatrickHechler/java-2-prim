@@ -1,5 +1,7 @@
-package de.hechler.patrick.j2p;
+package de.hechler.patrick.j2p.parse;
 
+import java.lang.reflect.Modifier;
+import java.util.Set;
 
 @SuppressWarnings("javadoc")
 public class ClassFile {
@@ -15,8 +17,8 @@ public class ClassFile {
 	private JMethod[]       methods;
 	private JBootstrap[]    bootstrapMethods;
 	private JType           nestHost;
-	private JType[]         nestMembers;
-	private JType[]         permittedSubclasses;
+	private Set<JType>      nestMembers;
+	private Set<JType>      permittedSubclasses;
 	private boolean         finish;
 	
 	public ClassFile(int minor, int major, CPEntry[] constantPool) {
@@ -92,7 +94,7 @@ public class ClassFile {
 		if (this.nestMembers != null) {
 			throw new ClassFormatError("multiple NestMembers attributes!");
 		}
-		this.nestMembers = nestMembers;
+		this.nestMembers = Set.of(nestMembers);
 	}
 	
 	public void initPermittedSubclasses(JType[] permittedSubclasses) {
@@ -100,7 +102,7 @@ public class ClassFile {
 		if (this.permittedSubclasses != null) {
 			throw new ClassFormatError("multiple PermittedSubclasses attributes!");
 		}
-		this.permittedSubclasses = permittedSubclasses;
+		this.permittedSubclasses = Set.of(permittedSubclasses);
 	}
 	
 	public void finish() {
@@ -138,20 +140,90 @@ public class ClassFile {
 		return this.fields;
 	}
 	
-	public JBootstrap[] bootstrapMethods() {
-		return this.bootstrapMethods;
+	public JBootstrap bootstrapMethod(int index) {
+		if (index < 0 || index >= this.bootstrapMethods.length) {
+			throw new AssertionError();
+		}
+		return this.bootstrapMethods[index];
 	}
 	
 	public JType nestHost() {
 		return this.nestHost;
 	}
 	
-	public JType[] nestMembers() {
+	public Set<JType> nestMembers() {
 		return this.nestMembers;
 	}
 	
-	public JType[] permittedSubclasses() {
+	public Set<JType> permittedSubclasses() {
 		return this.permittedSubclasses;
+	}
+	
+	@Override
+	public String toString() {
+		String        nl = System.lineSeparator();
+		StringBuilder b  = new StringBuilder();
+		b.append("minor=").append(this.minor).append(" major=").append(this.major).append(nl);
+		if (this.constantPool != null) {
+			b.append("constant pool: [").append(nl);
+			for (int i = 0; i < this.constantPool.length; i++) {
+				b.append("  ").append(i + 1).append(" : 0x").append(Integer.toHexString(i + 1)).append(" = ").append(this.constantPool[i]).append(nl);
+			}
+			b.append(']').append(nl);
+		}
+		b.append("access_flags: ").append(this.accessFlags).append(" : 0x").append(Integer.toHexString(this.accessFlags)).append(" : ")
+				.append(Modifier.toString(this.accessFlags)).append(nl);
+		if (this.thisClass != null) {
+			b.append("this_class: ").append(this.thisClass);
+			if (this.superClass == null) b.append(nl);
+			else b.append(" super_class: ").append(this.superClass).append(nl);
+		} else if (this.superClass != null) {
+			b.append("super_class: ").append(this.superClass).append(nl);
+		}
+		if (this.interfaces != null) {
+			b.append("interfaces:");
+			for (int i = 0; i < this.interfaces.length; i++) {
+				b.append(' ').append(this.interfaces[i]);
+			}
+			b.append(nl);
+		}
+		if (this.fields != null) {
+			b.append("fields:").append(nl);
+			for (int i = 0; i < this.fields.length; i++) {
+				b.append("  ").append(this.fields[i]).append(nl);
+			}
+		}
+		if (this.methods != null) {
+			b.append("methods:").append(nl);
+			for (int i = 0; i < this.methods.length; i++) {
+				this.methods[i].toString().lines().forEach(line -> b.append("  ").append(line).append(nl));
+			}
+		}
+		if (this.bootstrapMethods != null) {
+			b.append("BootstrapMethods:").append(nl);
+			for (JBootstrap bm : this.bootstrapMethods) {
+				b.append("  ").append(bm).append(nl);
+			}
+		}
+		if (this.nestHost != null) {
+			b.append("NestHost: ").append(this.nestHost);
+		}
+		if (this.nestMembers != null) {
+			b.append("NestMembers:");
+			for (JType nm : this.nestMembers) {
+				b.append(' ').append(nm);
+			}
+			b.append(nl);
+		}
+		if (this.permittedSubclasses != null) {
+			b.append("PermittedSubclasses:");
+			for (JType ps : this.permittedSubclasses) {
+				b.append(' ').append(ps);
+			}
+			b.append(nl);
+		}
+		
+		return b.toString();
 	}
 	
 }

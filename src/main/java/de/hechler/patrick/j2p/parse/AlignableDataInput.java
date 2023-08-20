@@ -1,4 +1,4 @@
-package de.hechler.patrick.j2p;
+package de.hechler.patrick.j2p.parse;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -8,7 +8,7 @@ import java.io.InputStream;
 public class AlignableDataInput extends DataInputStream {
 	
 	public AlignableDataInput(InputStream in) {
-		super(in instanceof AlignableDataInput ? in : new AlignableDataInput(in));
+		super(in instanceof AlignableInput ? in : new AlignableInput(in));
 	}
 	
 	/**

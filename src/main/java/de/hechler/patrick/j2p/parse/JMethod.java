@@ -1,4 +1,4 @@
-package de.hechler.patrick.j2p;
+package de.hechler.patrick.j2p.parse;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -78,13 +78,13 @@ public class JMethod {
 				locals.add(new JSMEVerificationInfo.ObjectInfo(type));
 			}
 		}
-		entries[0] = new JStackMapEntry.FullDescribtion(-1, locals.toArray(new JSMEVerificationInfo[locals.size()]), JStackMapEntry.EMPTY_ARRAY);
+		entries[0]           = new JStackMapEntry.FullDescribtion(-1, locals.toArray(new JSMEVerificationInfo[locals.size()]), JStackMapEntry.EMPTY_ARRAY);
 		this.stackMapEntries = entries;
 	}
 	
 	
 	public void finish() {
-		if (this.stackMapEntries == null) {
+		if (this.stackMapEntries == null && (this.accessFlags & Modifier.ABSTRACT) == 0) {
 			initStackMapTable(new JStackMapEntry[1]);
 		}
 	}
@@ -107,6 +107,45 @@ public class JMethod {
 	
 	public JStackMapEntry[] stackMapEntries() {
 		return this.stackMapEntries;
+	}
+	
+	@Override
+	public String toString() {
+		String        nl = System.lineSeparator();
+		StringBuilder b  = new StringBuilder();
+		b.append("accessFlags: ").append(this.accessFlags).append(" : 0x").append(Integer.toHexString(this.accessFlags)).append(" : ")
+				.append(Modifier.toString(this.accessFlags));
+		if (this.name != null) {
+			b.append(" name=").append(this.name);
+		}
+		if (this.methodType != null) {
+			b.append(" descriptor=").append(this.methodType);
+		}
+		b.append(nl);
+		b.append("  maxLocals=").append(this.maxLocals).append(" maxStack=").append(this.maxStack).append(nl);
+		if (this.cmds != null) {
+			b.append("  Code: [").append(nl);
+			for (JCommand c : this.cmds) {
+				b.append("    at: ").append(c.address()).append(" : 0x").append(Long.toHexString(c.address())).append(" ==> ").append(c).append(nl);
+			}
+			b.append("  ]").append(nl);
+		}
+		if (this.handlers != null) {
+			b.append("  Code->ExceptionHandlers: [").append(nl);
+			for (int i = 0; i < this.handlers.length; i++) {
+				b.append("    ").append(this.handlers[i]).append(nl);
+			}
+			b.append("  ]").append(nl);
+		}
+		if (this.stackMapEntries != null) {
+			b.append("  Code->StackMapTable: [").append(nl);
+			b.append("    implicit first entry: ").append(nl);
+			for (int i = 0; i < this.stackMapEntries.length; i++) {
+				b.append("    ").append(this.stackMapEntries[i]).append(nl);
+			}
+			b.append("  ]").append(nl);
+		}
+		return b.toString();
 	}
 	
 }

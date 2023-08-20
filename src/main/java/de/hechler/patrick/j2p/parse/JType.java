@@ -1,4 +1,4 @@
-package de.hechler.patrick.j2p;
+package de.hechler.patrick.j2p.parse;
 
 
 public sealed interface JType {

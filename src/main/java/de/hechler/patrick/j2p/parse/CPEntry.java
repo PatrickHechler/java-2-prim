@@ -1,4 +1,4 @@
-package de.hechler.patrick.j2p;
+package de.hechler.patrick.j2p.parse;
 
 
 @SuppressWarnings("javadoc")
@@ -28,6 +28,17 @@ public sealed interface CPEntry {
 			return t;
 		}
 		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("CPEClass [nameIndex=");
+			builder.append(this.nameIndex);
+			builder.append(", type=");
+			builder.append(this.type);
+			builder.append("]");
+			return builder.toString();
+		}
+		
 	}
 	
 	final class CPEMethodType implements CPEntry {
@@ -52,6 +63,17 @@ public sealed interface CPEntry {
 			MethodType t = this.type;
 			if (t == null) throw new AssertionError();
 			return t;
+		}
+		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("CPEMethodType [mtypeIndex=");
+			builder.append(this.mtypeIndex);
+			builder.append(", type=");
+			builder.append(this.type);
+			builder.append("]");
+			return builder.toString();
 		}
 		
 	}
@@ -98,20 +120,38 @@ public sealed interface CPEntry {
 			return t;
 		}
 		
+		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("CPEFieldRef [classIndex=");
+			builder.append(this.classIndex);
+			builder.append(", nameAndTypeIndex=");
+			builder.append(this.nameAndTypeIndex);
+			builder.append(", cls=");
+			builder.append(this.cls);
+			builder.append(", name=");
+			builder.append(this.name);
+			builder.append(", type=");
+			builder.append(this.type);
+			builder.append("]");
+			return builder.toString();
+		}
+		
 	}
 	
-	sealed class CPENormalMethodRef implements CPEntry {
+	abstract sealed class CPENormalMethodRef implements CPEntry {
 		
 		public final int classIndex;
 		public final int nameAndTypeIndex;
 		
-		private JType  cls;
-		private String name;
-		private JType  type;
+		private JType      cls;
+		private String     name;
+		private MethodType type;
 		
 		public CPENormalMethodRef(int classIndex, int nameAndTypeIndex) { this.classIndex = classIndex; this.nameAndTypeIndex = nameAndTypeIndex; }
 		
-		public void initVals(JType cls, String name, JType type) {
+		public void initVals(JType cls, String name, MethodType type) {
 			if (this.cls != null) {
 				if (!this.cls.equals(cls) || !this.name.equals(name) || !this.type.equals(type)) {
 					throw new AssertionError();
@@ -135,10 +175,27 @@ public sealed interface CPEntry {
 			return n;
 		}
 		
-		public JType type() {
-			JType t = this.type;
+		public MethodType type() {
+			MethodType t = this.type;
 			if (t == null) throw new AssertionError();
 			return t;
+		}
+		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append(this.getClass().getSimpleName()).append(" [classIndex=");
+			builder.append(this.classIndex);
+			builder.append(", nameAndTypeIndex=");
+			builder.append(this.nameAndTypeIndex);
+			builder.append(", cls=");
+			builder.append(this.cls);
+			builder.append(", name=");
+			builder.append(this.name);
+			builder.append(", type=");
+			builder.append(this.type);
+			builder.append("]");
+			return builder.toString();
 		}
 		
 	}
@@ -183,6 +240,17 @@ public sealed interface CPEntry {
 			return s;
 		}
 		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("CPEString [nameIndex=");
+			builder.append(this.nameIndex);
+			builder.append(", str=");
+			builder.append(this.str);
+			builder.append("]");
+			return builder.toString();
+		}
+		
 	}
 	
 	record CPEInt(int val) implements CPEntry {}
@@ -198,8 +266,9 @@ public sealed interface CPEntry {
 		public final int nameIndex;
 		public final int typeIndex;
 		
-		private String name;
-		private JType  type;
+		private String     name;
+		private JType      type;
+		private MethodType mtype;
 		
 		public CPENameAndType(int nameIndex, int typeIndex) { this.nameIndex = nameIndex; this.typeIndex = typeIndex; }
 		
@@ -214,6 +283,17 @@ public sealed interface CPEntry {
 			}
 		}
 		
+		public void initVals(String name, MethodType mtype) {
+			if (this.name != null) {
+				if (!this.name.equals(name) || !this.mtype.equals(mtype)) {
+					throw new AssertionError();
+				}
+			} else {
+				this.name  = name;
+				this.mtype = mtype;
+			}
+		}
+		
 		public String name() {
 			String n = this.name;
 			if (n == null) throw new AssertionError();
@@ -222,8 +302,31 @@ public sealed interface CPEntry {
 		
 		public JType type() {
 			JType t = this.type;
-			if (t == null) throw new AssertionError();
+			if (t == null) throw new ClassFormatError("this is a method type name and type entry");
 			return t;
+		}
+		
+		public MethodType mtype() {
+			MethodType mt = this.mtype;
+			if (mt == null) throw new ClassFormatError("this is a class type name and type entry");
+			return mt;
+		}
+		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("CPENameAndType [nameIndex=");
+			builder.append(this.nameIndex);
+			builder.append(", typeIndex=");
+			builder.append(this.typeIndex);
+			builder.append(", name=");
+			builder.append(this.name);
+			builder.append(", type=");
+			builder.append(this.type);
+			builder.append(", mtype=");
+			builder.append(this.mtype);
+			builder.append("]");
+			return builder.toString();
 		}
 		
 	}
@@ -296,6 +399,23 @@ public sealed interface CPEntry {
 			return this.mref;
 		}
 		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("CPEMethodHandle [refKind=");
+			builder.append(this.refKind);
+			builder.append(", refIndex=");
+			builder.append(this.refIndex);
+			builder.append(", fref=");
+			builder.append(this.fref);
+			builder.append(", mref=");
+			builder.append(this.mref);
+			builder.append(", imref=");
+			builder.append(this.imref);
+			builder.append("]");
+			return builder.toString();
+		}
+		
 	}
 	
 	record CPEDynamic(int bootstrapMetAttrIndex, int nameAndTypeIndex) implements CPEntry {}
@@ -326,6 +446,17 @@ public sealed interface CPEntry {
 			return n;
 		}
 		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("CPEModule [nameIndex=");
+			builder.append(this.nameIndex);
+			builder.append(", name=");
+			builder.append(this.name);
+			builder.append("]");
+			return builder.toString();
+		}
+		
 	}
 	
 	final class CPEPackage implements CPEntry {
@@ -350,6 +481,17 @@ public sealed interface CPEntry {
 			String n = this.name;
 			if (n == null) throw new AssertionError();
 			return n;
+		}
+		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("CPEPackage [nameIndex=");
+			builder.append(this.nameIndex);
+			builder.append(", name=");
+			builder.append(this.name);
+			builder.append("]");
+			return builder.toString();
 		}
 		
 	}
