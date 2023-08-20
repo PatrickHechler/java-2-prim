@@ -1,6 +1,6 @@
 # Java-2-Prim
-the [Method call](#Method_call) section describes how natives code has to invoke java code, how native code is invoked and how java code invokes other java methods.    
-the [Method excecution](#Method_excecution) section describes how java methods are executed.    
+the [Method call](#method-call) section describes how natives code has to invoke java code, how native code is invoked and how java code invokes other java methods.    
+the [Method excecution](#method-excecution) section describes how java methods are executed.    
 ## Method call
 ### JNI Argument
 #### Java code calls
@@ -27,7 +27,7 @@ if there are no arguments the first method nothing needs to be done
 ### Return Value
 if there is a return value it is stored in the `X00` register
 ## Method excecution
-the [Local Variables](#Local_Variables) section describes how the local variables are stored during the execution of an java method.    
+the [Local Variables](#local-variables) section describes how the local variables are stored during the execution of an java method.    
 ### Local Variables
 they are stored like the [arguments](#arguments)
 ### Operant Stack
