@@ -4,7 +4,7 @@ the [Method call](#method-call) section describes how natives code has to invoke
 the [_JNI-Env_](#_jni-env_) section list all operations of the _JNI-Env_.
 the [Class Loading](#class-loading) section describes how classes are loaded and found    
 the [Method excecution](#method-excecution) section describes how java methods are executed.    
-the [Initialisation](#initialisation) section describes how _pvm-java_ can be initilized.    
+the [Initialisation](#initialization) section describes how _pvm-java_ can be initilized.    
 
 ## Constants
 + `ERR_JAVA_THROW` : `17` : `HEX-11`
@@ -246,7 +246,7 @@ the order and effective usage of the following must remain:
 
 for the outside it must look like the original bytecode whould be interpreted
 
-## Initialisation
+## Initialization
 to start the java main method first _pvm-java#INIT_ has to be executed.    
 after _pvm-java#INIT_ returned the native code can use the _JNI-Env_ to execute java code.    
 additionally _pvm-java#MAIN_ can be used to execute the `main` method of the java code
@@ -257,7 +257,7 @@ to initialize _pvm-java_ load `"/java/pvm-java"` and execute the function _pvm-j
 2. store the start address of the copy in the `X00` register
 3. execute the function at address `X00 + [X00]`
 
-this can either be by using the `INT_LOAD_LIB` interrupt
+this can be done by using the `INT_LOAD_LIB` interrupt
 ``` 
 MOV X00, {ADDRESS_OF "/java/pvm-java\0"}
 XOR X01, X01 |> or MOV X01, 0
