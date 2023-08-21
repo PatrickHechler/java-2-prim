@@ -4,6 +4,7 @@ the [Method call](#method-call) section describes how natives code has to invoke
 the [_JNI-Env_](#_jni-env_) section list all operations of the _JNI-Env_.
 the [Class Loading](#class-loading) section describes how classes are loaded and found    
 the [Method excecution](#method-excecution) section describes how java methods are executed.    
+the [Initialisation](#initialisation) section describes how _pvm-java_ can be initilized.    
 
 ## Constants
 + `ERR_JAVA_THROW` : `17` : `HEX-11`
@@ -244,3 +245,92 @@ the order and effective usage of the following must remain:
 + field (and array element) accesses/assignments/modifications
 
 for the outside it must look like the original bytecode whould be interpreted
+
+## Initialisation
+to start the java main method first _pvm-java#INIT_ has to be executed.    
+after _pvm-java#INIT_ returned the native code can use the _JNI-Env_ to execute java code.    
+additionally _pvm-java#MAIN_ can be used to execute the `main` method of the java code
+
+### _pvm-java#INIT_
+to initialize _pvm-java_ load `"/java/pvm-java"` and execute the function _pvm-java#INIT_:
+1. load a copy of the file `"/java/pvm-java"` to RAM
+2. store the start address of the copy in the `X00` register
+3. execute the function at address `X00 + [X00]`
+
+this can either be by using the `INT_LOAD_LIB` interrupt
+``` 
+MOV X00, {ADDRESS_OF "/java/pvm-java\0"}
+XOR X01, X01 |> or MOV X01, 0
+MOV X02, 1
+INT INT_LOAD_FILE
+```
+using the `INT_LOAD_LIB` interrupt also reduces the possibility of having two java enviroments.
+
+## _pvm-java#MAIN_
+
+after [_pvm-java#INIT_](#_pvm-java-init_) was executed _pvm-java#MAIN_ can be used to start the `main` method of the java code.
+
+### _pvm-java#MAIN_ arguments
+_pvm-java#MAIN_ accept the following arguments:
++ `X03` `argv` (`char##`) the arguments of the program
+    + ignored when set to `0` or a negative value.
+    + ignored when `argc` is set to `1`, `0` or a negative value
+    + `argv` is points to an array of `UTF-8` encoded `\0` terminated strings
+    + the first entry (`argv[0]`/`[X03]`) is ignored
+    + `argc` is used to now how many entries are in `argv`
++ `X04` `argc` (`num`) the number of arguments of the program
+    + see `argv`
++ `X05` `unloadMe` (`ubyte#`) the pointer to the initial binary which was loaded at the start of the `PVM`
+    + ignored if set to `0` or a negative value
+    + otherwies the `INT_UNLOAD_LIB` interrupt is executed to unload `unloadMe`
++ `X06` `defaultMain` (`char#`) the binary name of the main class which should be started if no class is specified by `argv`
+    + ignored if set to `0` or a negative value
+    + `defaultMain` points to an `UTF-8` encoded `\0` terminated string
++ `X07` `alwaysDefaultMain` (`num`) `0` if `argv` is allowed to overwrite `defaultMain` and any other value if not
+    + ignored if `defaultMain` is ignored
+    + if `alwaysDefaultMain` is set to `0` `argv` can specify which class should be used as main class
+    + if `alwaysDefaultMain` is set to a value other than `0` `argv` will be converted to a `String[]` and passed to `defaultMain`
+        + note that the first entry of `argv` is still ignored
++ `X08` `defMainModule` (`char#`) the name of the default main classes module
+    + ignored if `defaultMain` is ignored
+    + ignored if set to `0` or a negative value
+    + `defMainModule` points to an `UTF-8` encoded `\0` terminated string
+
+if both `argv` and `defaultMain` are ignored _pvm-java#MAIN_ will exit with a non-zero value.
+
+### executing _pvm-java#MAIN_
+to only execute _pvm-java#MAIN_ jump to the address which is calculated by adding `8` to the memory address of the "/java/pvm-java" file:
+```
+JMPO {ADDRESS_OF "/java/pvm-java\0"}, 8
+```
+_pvm-java#MAIN_ will never return, so there is no reason to store the curren `IP` on the stack.    
+note that this will fail, because at least on of the arguments `argv` or `defaultMain` has to be passed
+
+a file which only initializes and then executes _pvm-java#MAIN_ can look like:
+```
+~READ_SYM "[THIS]" #ADD~FOR_ME 1 >
+~IF #~FOR_ME
+    #OFF_LEA_DEF_MAIN 0
+    #OFF_LEA_DEF_MODULE 0
+    #OFF_LEA_PVM_JAVA 0
+~ENDIF
+MOV X05, IP |> directly move IP to X05, because at the start IP has no offset
+MOV X03, X01 |> set argv
+MOV X04, X00 |> set argc
+#POS_LEA_DEF_MAIN --POS--
+LEA X06, OFF_LEA_DEF_MAIN |> set defaultMain
+#POS_LEA_DEF_MODULE --POS--
+LEA X08, OFF_LEA_DEF_MODULE |> set defMainModule
+MOV X07, 1 |> note that alwaysDefaultMain/X07 is initilized with 0, so this is only needed when alwaysDefaultMain should have a non-zero value
+#POS_LEA_PVM_JAVA --POS--
+LEA X00, OFF_LEA_PVM_JAVA |> offset of /java/pvm-java
+INT INT_LOAD_LIB |> first call pvm-java#INIT
+JMPO X00, 8 |> jump to pvm-java#MAIN
+$not-align |> UTF-8 strings do not need to be 64-bit aligned
+#EXP~OFF_LEA_PVM_JAVA (--POS-- - POS_LEA_PVM_JAVA)
+: CHARS 'UTF-8' "/java/pvm-java\0" >
+#EXP~OFF_LEA_DEF_MAIN (--POS-- - POS_LEA_DEF_MAIN)
+: CHARS 'UTF-8' "my/def/ault/Main\0" > |> only needed if defaultMain should be set
+#EXP~OFF_LEA_DEF_MODULE (--POS-- - POS_LEA_DEF_MODULE)
+: CHARS 'UTF-8' "my.module\0" > |> only needed if defMainModule should be set
+```
