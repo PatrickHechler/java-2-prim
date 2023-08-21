@@ -1,15 +1,27 @@
 # Java-2-Prim
 the [Constants](#constants) section defines Constants.    
 the [Method call](#method-call) section describes how natives code has to invoke java code, how native code is invoked by java code and how java code invokes other java methods.    
+the [_JNI-Env_](#_jni-env_) section list all operations of the _JNI-Env_.
 the [Class Loading](#class-loading) section describes how classes are loaded and found    
 the [Method excecution](#method-excecution) section describes how java methods are executed.    
 
 ## Constants
 + `ERR_JAVA_THROW` : `17` : `HEX-11`
     + this constant indicates that an java exception is currently thrown
++ `ERR_JAVA_NO_SUCH_CLASS` : `18` : `HEX-12`
+    + this constant indicates that a non-existing class was searched
++ `ERR_JAVA_NO_SUCH_METHOD` : `18` : `HEX-12`
+    + this constant indicates that a non-existing method was searched
++ `ERR_JAVA_NO_SUCH_FIELD` : `19` : `HEX-13`
+    + this constant indicates that a non-existing field was searched
++ `ERR_JAVA_PERM` : `20` : `HEX-14`
+    + this constant indicates that it was tried to access a field or invoce a method, which is not visible
+    + this constant can also indicate that a static/instance field/method was treated like an instance/static field/method
++ `ERR_JAVA_CAST` : `21` : `HEX-15`
+    + this constant indicates that a cast failed
 
 ## Method call
-### JNI Argument
+### _JNI-Env_ Argument
 #### Java code calls
 the _JNI-Env_ pointer is passed in the `X1F` register    
 + if a `native` method is invoked _pvm-java_ sets the `X1F` register to the _JNI-Env_ pointer after the native code returns
@@ -17,21 +29,27 @@ the _JNI-Env_ pointer is passed in the `X1F` register
 + otherwise the _JNI-Env_ pointer also has to be stored in the `X1F` register when the method returns
 
 #### native code calls java code
-_pvm-java_ saves the `X1F` register on the stack and overwrites it with the _JNI-Env_ pointer
+_pvm-java_ saves the `X1F` register on the stack and overwrites it with the _JNI-Env_ pointer.
 
 ### Arguments
 if possible, the arguments are stored in the registers after the `X1F` register:
-1. `X20` contains the first argument (`this` for non-static methods)
+1. `X20` contains the first argument
+    + this is either a reference to `this` or to the `class` of the method to be executed
 2. `X21` contains the second argument
 3. ...
 
 if this is not possible (there are more arguments then registers after the `X1F` register exist)
-+ `X20` points to the arguments
-+ `X20` was allocated with `INT_MEMORY_ALLOC` and is not needed anywhere else
+1. `X20` contains the first argument
+    + this is either a reference to `this` or to the `class` of the method to be executed
++ `X21` points to the arguments
++ `X21` was allocated with `INT_MEMORY_ALLOC` and is not needed anywhere else
     + this means that the method is can use `INT_MEMORY_REALLOC` to resize the array
     + this means also that the invoked method __must__ use the `INT_MEMORY_FREE` interrupt, once the block is no longer needed by the method
 
-if there are no arguments the first method nothing needs to be done
+#### Native code calls
+for native code to execute a method invocation it has to use the _JNI-Env_.    
+additional to the description above, the native code has to store a _method-reference_ of the method to be invoced in the `X1E` register
+
 ### Return
 #### Normal Return
 if there is a return value it is stored in the `X00` register.
@@ -61,10 +79,148 @@ a reference to that exception is stored in the `X00` register and `ERRNO` is set
 when returning from native code _pvm-java_ __must__ set `X00` and `ERRNO`    
 when returning from java code to native code _pvm-java_ __must__ save a reference to the exception instance from `X00` somewhere else, when `ERRNO` is set to `ERR_JAVA_THROW`
 
+## _JNI-Env_
+the _JNI-Env_ pointer is usually stored in the `X1F` register (see [Method Call](#method-call)).
+
+note that no operation allows any of its reference parameters to be invalid or `null` (`-1`) unless otherwise noted.    
+If any reference is invalid (or `null` (`-1)) the behavior is undefined.    
+a weak references become invalid when the instance which its target becomes garbage collected
+
+Operations:
++ `offset=0=HEX-0`   : _throw_
+    + `X00` stores a reference to the exception instance which should been thrown
+    + `ERRNO` will be set to `ERR_JAVA_THROW`
+    + if there is already an exception instance which is being thrown, it will be catched and ignored
++ `offset=8=HEX-8`   : _isThrowing_
+    + sets `X00` to `1` if there is currently an exception instance being thrown
+    + sets `X00` to `0` if currently there is no exception instance being thrown
++ `offset=16=HEX-10` : _getThrowingClass_
+    + sets `X00` to a reference of the class from the exception instance, which is currently being thrown
+    + sets `X00` to a `-1` if currently there is no exception instance being thrown
++ `offset=24=HEX-18` : _catch_
+    + sets `X00` to a reference of the exception instance, which is now handled
+    + sets `X00` to a `-1` if currently there is no exception instance being thrown
++ `offset=32=HEX-20` : _findClass_
+    + `X00` is set to an _UTF-8_ `\0` terminated string, which contains the class binary name
+    + `X01` will be set to a reference of the class
+        + if the class was previusly not loaded, it will be loaded by this operation
+    + if the class could not be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_CLASS`
++ `offset=40=HEX-28` : _findInstanceMethod_
+    + `X00` is a reference to a class object
+    + `X01` is set to an _UTF-8_ `\0` terminated string, which contains the method name
+    + `X02` is set to an _UTF-8_ `\0` terminated string, which contains the method descriptor
+    + `X03` will be set to a _method-reference_
+    + if no such method could be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_METHOD`
++ `offset=48=HEX-30` : _findStaticMethod_
+    + `X00` is a reference to a class object
+    + `X01` is set to an _UTF-8_ `\0` terminated string, which contains the method name
+    + `X02` is set to an _UTF-8_ `\0` terminated string, which contains the method descriptor
+    + `X03` will be set to a _method-reference_
+    + if no such method could be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_METHOD`
++ `offset=56=HEX-38` : _findInstanceField_
+    + `X00` is a reference to a class object
+    + `X01` is set to an _UTF-8_ `\0` terminated string, which contains the field name
+    + `X02` is set to an _UTF-8_ `\0` terminated string, which contains the field descriptor
+    + `X03` will be set to a _field-reference_
+    + if no such method could be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_FIELD`
++ `offset=64=HEX-40` : _findStaticField_
+    + `X00` is a reference to a class object
+    + `X01` is set to an _UTF-8_ `\0` terminated string, which contains the field name
+    + `X02` is set to an _UTF-8_ `\0` terminated string, which contains the field descriptor
+    + `X03` will be set to a _field-reference_
+    + if no such method could be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_FIELD`
++ `offset=72=HEX-48` : _invokeInstance_
+    + `X1E` is a reference to a _method-reference_
+    + `X20` is set to a reference of the object instance which should be invoked
+    + `X00` will be set to the return value of the method (if any)
+    + when the method returns by throwing an exception `ERRNO` will be set to `ERR_JAVA_THROW`
+        + otherwise it will be set to the previus value of `ERRNO` (the value it had when the method was invoced)
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
++ `offset=80=HEX-50` : _invokeStatic_
+    + `X1E` is a reference to a _method-reference_
+    + `X00` will be set to the return value of the method (if any)
+    + when the method returns by throwing an exception `ERRNO` will be set to `ERR_JAVA_THROW`
+        + otherwise it will be set to the previus value of `ERRNO` (the value it had when the method was invoced)
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
++ `offset=88=HEX-58` : _invokeSuper_
+    + `X1E` is a reference to a _method-reference_
+    + `X20` is set to a reference of the object instance which should be invoked
+    + `X00` will be set to the return value of the method (if any)
+    + when the method returns by throwing an exception `ERRNO` will be set to `ERR_JAVA_THROW`
+        + otherwise it will be set to the previus value of `ERRNO` (the value it had when the method was invoced)
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
++ `offset=96=HEX-60` : _new_
+    + `X1E` is a reference to a _method-reference_
+    + `X00` will be set to a reference of the newly created instance
+    + when the method returns by throwing an exception `ERRNO` will be set to `ERR_JAVA_THROW`
+        + otherwise it will be set to the previus value of `ERRNO` (the value it had when the method was invoced)
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
++ `offset=104=HEX-68` : _getStaticField_
+    + `X00` is a reference to a _field-reference_
+    + `X01` will be set to the value of the field
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
++ `offset=112=HEX-70` : _getInstanceField_
+    + `X00` is a reference to a _field-reference_
+    + `X01` is a reference of the object instance
+    + `X02` will be set to the value of the field
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
+    + when the field belongs to a class which is no superclass of the object `ERRNO` will be set to `ERR_JAVA_CAST`
++ `offset=120=HEX-78` : _putStaticField_
+    + `X00` is a reference to a _field-reference_
+    + `X01` is set to the new value of the field
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
++ `offset=128=HEX-80` : _putInstanceField_
+    + `X00` is a reference to a _field-reference_
+    + `X01` is a reference of the object instance
+    + `X02` is set to the new value of the field
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
+    + when the field belongs to a class which is no superclass of the object `ERRNO` will be set to `ERR_JAVA_CAST`
++ `offset=136=HEX-88` : _createLocalReference_
+    + `X00` is set to a reference or an already garbage collected reference (but not removed)
+    + `X01` is set to a new local reference to the same object instance
+    + if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
+    + when the native code returns all its local references will be removed. this includes references which where passed as arguments
++ `offset=144=HEX-90` : _createGlobalReference_
+    + `X00` is set to a reference or an already garbage collected reference (but not removed)
+    + `X01` is set to a new globl reference to the same object instance
+    + if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
+    + global references live until they are explicitly removed
++ `offset=152=HEX-98` : _createWeakReference_
+    + `X00` is set to a reference or an already garbage collected reference (but not removed)
+    + `X01` is set to a new weak reference to the same object instance
+    + if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
+    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
+    + weak references do not prevent their target from being garbage collected, but can live until they are removed (either explicitly by using _removeReference_ or implicitly by using a _create*Reference_ operation after the target instance was garbage collected)
++ `offset=160=HEX-A0` : _removeReference_
+    + `X00` is set to a reference or an already garbage collected reference (but not removed)
+    + this operation removes the given reference and makes any further use of it invalid
++ `offset=168=HEX-A8` : _ensureFrameSize_
+    + `X00` is set to the minimum amount of needed local references
+    + native code starts with a frame large enugh to hold 16 local references
++ `offset=176=HEX-B0` : _growFrame_
+    + `X00` is set to the amount of additional needed local references
+    + native code starts with a frame large enugh to hold 16 local references
++ `offset=184=HEX-B8` : _shrinkFrame_
+    + `X00` is set to the amount of no longer needed local references
+    + native code starts with a frame large enugh to hold 16 local references
+
+### java code
+java code can use all _JNI-Env_ operations except of the following
++ exception handling releated operateions:
+    + _throw_, _isThrowing_, _getThrowingClass_ and _catch_
++ local reference/frame releated:
+    + _ensureFrameSize_, _growFrame_, _shrinkFrame_ and _createLocalReference_
+
 ## Class Loading
+### java code
 classes are loaded/found using the `INT_LOAD_LIB` interrupt.    
 all classes have to store the offset (as a 64-bit value) of their `<cinit>` method at the start of the file. (the offset is relative to the file-start)    
 if a class has no `<cinit>` method the offset is instead set to `-1`    
+
+### native code
+native code can load/find classes via the _JNI-Env_.
 
 ## Method excecution
 the [Local Variables](#local-variables) section describes how the local variables are stored during the execution of an java method.    
