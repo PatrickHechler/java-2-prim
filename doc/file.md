@@ -266,6 +266,8 @@ INT INT_LOAD_FILE
 ```
 using the `INT_LOAD_LIB` interrupt also reduces the possibility of having two java enviroments.
 
+after _pvm-java#INIT_ returned the register `X1F` will be overwritten with the `JNI-Env` pointer.
+
 ## _pvm-java#MAIN_
 
 after [_pvm-java#INIT_](#_pvm-java-init_) was executed _pvm-java#MAIN_ can be used to start the `main` method of the java code.
@@ -323,7 +325,10 @@ LEA X06, OFF_LEA_DEF_MAIN |> set defaultMain
 LEA X08, OFF_LEA_DEF_MODULE |> set defMainModule
 MOV X07, 1 |> note that alwaysDefaultMain/X07 is initilized with 0, so this is only needed when alwaysDefaultMain should have a non-zero value
 #POS_LEA_PVM_JAVA --POS--
+|> set the args for INT_LOAD_LIB
 LEA X00, OFF_LEA_PVM_JAVA |> offset of /java/pvm-java
+XOR X01, X01 |> or MOV X01, 0 |> set initOff
+MOV X02, 1 |> set initIsPntr
 INT INT_LOAD_LIB |> first call pvm-java#INIT
 JMPO X00, 8 |> jump to pvm-java#MAIN
 $not-align |> UTF-8 strings do not need to be 64-bit aligned
