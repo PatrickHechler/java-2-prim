@@ -1,6 +1,7 @@
 package de.hechler.patrick.j2p.parse;
 
 
+@SuppressWarnings("javadoc")
 public sealed interface JType {
 	
 	enum JPrimType implements JType {
@@ -24,11 +25,33 @@ public sealed interface JType {
 		
 	}
 	
+	enum NullType implements JType {
+		TYPE
+	}
+	
 	record ObjectType(String binaryName) implements JType {
 		
 		@Override
 		public String toString() {
 			return "L" + this.binaryName + ";";
+		}
+		
+	}
+	
+	record UninitMe(String binaryName) implements JType {
+		
+		@Override
+		public String toString() {
+			return "uninitilized this: L" + this.binaryName + ";";
+		}
+		
+	}
+	
+	record UninitObjectType(int newAddress, JType type) implements JType {
+		
+		@Override
+		public String toString() {
+			return "uninitilized, created at 0x" + Integer.toHexString(this.newAddress) + " : " + this.newAddress + " : " + this.type;
 		}
 		
 	}

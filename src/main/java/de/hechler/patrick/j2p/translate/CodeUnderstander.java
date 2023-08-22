@@ -9,6 +9,8 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.function.Function;
 
+import org.stringtemplate.v4.compiler.STParser.memberExpr_return;
+
 import de.hechler.patrick.j2p.parse.CPEntry;
 import de.hechler.patrick.j2p.parse.ClassReader.JVMCmp;
 import de.hechler.patrick.j2p.parse.ClassReader.JVMMath;
@@ -16,8 +18,11 @@ import de.hechler.patrick.j2p.parse.ClassReader.JVMType;
 import de.hechler.patrick.j2p.parse.JCommand;
 import de.hechler.patrick.j2p.parse.JExceptionHandler;
 import de.hechler.patrick.j2p.parse.JMethod;
+import de.hechler.patrick.j2p.parse.JSMEVerificationInfo;
+import de.hechler.patrick.j2p.parse.JStackMapEntry;
+import de.hechler.patrick.j2p.parse.JStackMapEntry.FullDescribtion;
 import de.hechler.patrick.j2p.parse.JType;
-import de.hechler.patrick.j2p.translate.AbstractCommand.MethodInvokation;
+import de.hechler.patrick.j2p.translate.AbstractCommand.Goto;
 
 @SuppressWarnings("javadoc")
 public class CodeUnderstander {
@@ -28,25 +33,25 @@ public class CodeUnderstander {
 		VALUE
 	}
 	
-	record ConstantClass(JType cls) implements AbstractExpression.Constant {}
+	public static record ConstantClass(JType cls) implements AbstractExpression.Constant {}
 	
-	record Constant(JVMType type, long value) implements AbstractExpression.Constant {}
+	public static record Constant(JVMType type, long value) implements AbstractExpression.Constant {}
 	
-	record AccessField(AbstractExpression reference, CPEntry.CPEFieldRef field) implements AbstractExpression.AccessableValue {}
+	public static record AccessField(AbstractExpression reference, CPEntry.CPEFieldRef field) implements AbstractExpression.AccessableValue {}
 	
-	record AccessArray(JVMType atype, AbstractExpression reference, AbstractExpression index) implements AbstractExpression.AccessableValue {}
+	public static record AccessArray(JVMType atype, AbstractExpression reference, AbstractExpression index) implements AbstractExpression.AccessableValue {}
 	
-	record Parameter(int parameterIndex, JType parameterType) implements AbstractExpression.ParameterValue {}
+	public static record Parameter(int parameterIndex, JType parameterType) implements AbstractExpression.ParameterValue {}
 	
-	record InstanceOf(AbstractExpression a, JType cls) implements AbstractExpression.CalculationResult {}
+	public static record InstanceOf(AbstractExpression a, JType cls) implements AbstractExpression.CalculationResult {}
 	
-	record Compare(AbstractExpression a, JVMCmp op, AbstractExpression b) implements AbstractExpression.CalculationResult {}
+	public static record Compare(AbstractExpression a, JVMCmp op, AbstractExpression b) implements AbstractExpression.CalculationResult {}
 	
-	record FPCompare(AbstractExpression a, AbstractExpression b, JVMType type, int nanValue) implements AbstractExpression.CalculationResult {}
-
-	record Math(AbstractExpression a, JVMMath op, AbstractExpression b) implements AbstractExpression.CalculationResult {}
-
-	record Convert(AbstractExpression a, JVMType from, JVMType to) implements AbstractExpression.CalculationResult {}
+	public static record FPCompare(AbstractExpression a, AbstractExpression b, JVMType type, int nanValue) implements AbstractExpression.CalculationResult {}
+	
+	public static record MathCalc(AbstractExpression a, JVMMath op, AbstractExpression b) implements AbstractExpression.CalculationResult {}
+	
+	public static record Convert(AbstractExpression a, JVMType from, JVMType to) implements AbstractExpression.CalculationResult {}
 	
 	public AbstractCodeBuilder understand(JMethod method) {
 		Map<Integer, AbstractCodeBuilder>             jumps        = initJumps(method);
@@ -66,7 +71,7 @@ public class CodeUnderstander {
 						+ Long.toHexString(cmds.get(cmdListIndex).address()) + " : " + cmds.get(cmdListIndex).address() + " ==> " + cmds.get(cmdListIndex));
 				cmdListIndex++;
 			}
-			cmdListIndex = understandCodeBlock(cmds, cmdListIndex, end, current.getValue(), jumps);
+			cmdListIndex = understandCodeBlock(method, cmds, cmdListIndex, end, current.getValue(), jumps);
 			current      = next;
 		} while (current != null);
 		throw new UnsupportedOperationException("thats too much for me");
@@ -86,14 +91,50 @@ public class CodeUnderstander {
 			}
 		}
 		Integer             zero = Integer.valueOf(0);
-		AbstractCodeBuilder acb  = jumps.computeIfAbsent(zero, cia);
-		for (int i = 0; i < method.methodType.params().size(); i++) {
-			acb.localVariables[i] = new Parameter(i, method.methodType.params().get(i));
+		AbstractCodeBuilder acb  = jumps.computeIfAbsent(zero, cia);// the first stack entry is always a FullDescribtion
+		JStackMapEntry[]    smes = method.stackMapEntries();
+		acb.initParameters((FullDescribtion) smes[0], method); // do the first entry
+		List<JSMEVerificationInfo> stack      = new ArrayList<>(method.maxStack());
+		JSMEVerificationInfo[]     locals     = ((FullDescribtion) smes[0]).locals().clone();
+		int                        address    = 0;
+		int                        localCount = method.methodType.params().size();
+		for (int i = 1; i < smes.length; i++) {
+			JStackMapEntry sme = smes[i];
+			int            off = sme.offsetDelta();
+			address += off + 1;
+			if (sme instanceof JStackMapEntry.FullDescribtion fd) {
+				JSMEVerificationInfo[] fdl = fd.locals();
+				System.arraycopy(fd.locals(), 0, locals, 0, fdl.length);
+				Arrays.fill(locals, fdl.length, locals.length, null);
+				JSMEVerificationInfo[] fds = fd.stack();
+				stack.clear();
+				stack.addAll(Arrays.asList(fds));
+			} else if (sme instanceof JStackMapEntry.AppendedLocalsEmptyStack al) {
+				stack.clear();
+				JSMEVerificationInfo[] add = al.addedLocals();
+				System.arraycopy(add, 0, locals, localCount, add.length);
+				localCount += add.length;
+			} else if (sme instanceof JStackMapEntry.SameLocalsNewStack ns) {
+				stack.clear();
+				stack.addAll(Arrays.asList(ns.stack()));
+				int rl = ns.removedLocals();
+				if (rl != 0) { // expect only a few chop locals
+					Arrays.fill(locals, localCount - rl, localCount, null);
+					localCount -= rl;
+				}
+			} else {
+				throw new AssertionError("unknown JStackMapEntry type: " + sme.getClass());
+			}
+			acb = jumps.get(Integer.valueOf(address));
+			if (acb != null) {
+				acb.initParameters(locals, stack, method);
+			}
 		}
 		return jumps;
 	}
 	
-	private static int understandCodeBlock(List<JCommand> cmds, int cmdListIndex, int endAddress, AbstractCodeBuilder acb, Map<Integer, AbstractCodeBuilder> jumps) {
+	private static int understandCodeBlock(JMethod method, List<JCommand> cmds, int cmdListIndex, int endAddress, AbstractCodeBuilder acb,
+			Map<Integer, AbstractCodeBuilder> jumps) {
 		long                     endAddressLong = endAddress & 0xFFFFFFFFL;
 		List<AbstractCommand>    acbCmds        = acb.commands;
 		List<AbstractExpression> acbOpStack     = acb.operantStack;
@@ -102,44 +143,73 @@ public class CodeUnderstander {
 		JCommand                 cmd;
 		do {
 			cmd = cmds.get(cmdListIndex++);
-			understandCommand(acbCmds, acbOpStack, acbLocVars, acbLVL, cmd, jumps,
+			AbstractCommand addCmd = understandCommand(acbOpStack, acbLocVars, acbLVL, cmd, jumps,
 					cmds.size() <= cmdListIndex ? endAddress : (int) cmds.get(cmdListIndex).address());
+			if (addCmd != null) {
+				acbCmds.add(addCmd);
+				if (addCmd instanceof AbstractCommand.Goto || addCmd instanceof AbstractCommand.Return) {
+					return cmdListIndex;
+				}
+				if (addCmd instanceof AbstractCommand.IfGoto ig) {
+					if (!ig.elseTarget().nonFinalTarget().initilized()) {
+						initilize(method, ig.elseTarget().nonFinalTarget(), acb);
+					}
+					if (!ig.ifTarget().nonFinalTarget().initilized()) {
+						initilize(method, ig.ifTarget().nonFinalTarget(), acb);
+					}
+				}
+			}
 		} while (cmd.address() < endAddressLong);
+		System.err.println("block ends on a non goto and non return command (type: " + acbCmds.get(acbCmds.size() - 1) + ")");
 		return cmdListIndex;
 	}
 	
-	private static void understandCommand(List<AbstractCommand> commands, List<AbstractExpression> operantStack, AbstractExpression[] localVariables,
-			List<AbstractExpression> lvl, JCommand um, Map<Integer, AbstractCodeBuilder> jumps, int commandEnd) throws AssertionError {
+	private static void initilize(JMethod method, AbstractCodeBuilder init, AbstractCodeBuilder from) {
+		JSMEVerificationInfo[]     locs;
+		List<JSMEVerificationInfo> stack = new ArrayList<>(Math.min(method.maxStack(), from.operantStack.size() << 1));
+		int                        len;
+		for (len = from.localVariables.length; from.localVariables[len-1] == null ;len--);
+		AbstractExpression ae = from.localVariables[len-1];
+		if (ae instanceof Constant c && (c.type == JVMType.LONG || c.type == JVMType.DOUBLE)
+				|| ae instanceof AccessField f && (f.field.cls() == JType.JPrimType.LONG || f.field.cls() == JType.JPrimType.DOUBLE)
+				// TODO complete if
+				) {
+			len ++;
+		}
+		// TODO finish method
+	}
+	
+	private static AbstractCommand understandCommand(List<AbstractExpression> operantStack, AbstractExpression[] localVariables, List<AbstractExpression> lvl,
+			JCommand um, Map<Integer, AbstractCodeBuilder> jumps, int commandEnd) throws AssertionError {
 		if (um instanceof JCommand.PutField f) {
 			AbstractExpression value     = operantStack.remove(operantStack.size() - 1);
 			AbstractExpression objectref = f.instance ? operantStack.remove(operantStack.size() - 1) : null;
-			commands.add(new AbstractCommand.Assign(new AccessField(objectref, f.field), value));
+			return new AbstractCommand.Assign(new AccessField(objectref, f.field), value);
 		} else if (um instanceof JCommand.GetField f) {
 			AbstractExpression objectref = f.instance ? operantStack.remove(operantStack.size() - 1) : null;
 			AccessField        access    = new AccessField(objectref, f.field);
 			operantStack.add(access);
-			commands.add(new AbstractCommand.Access(access));
+			return new AbstractCommand.Access(access);
 		} else if (um instanceof JCommand.ArrayStore a) {
 			AbstractExpression value     = operantStack.remove(operantStack.size() - 1);
 			AbstractExpression index     = operantStack.remove(operantStack.size() - 1);
 			AbstractExpression objectref = operantStack.remove(operantStack.size() - 1);
-			commands.add(new AbstractCommand.Assign(new AccessArray(a.type, objectref, index), value));
+			return new AbstractCommand.Assign(new AccessArray(a.type, objectref, index), value);
 		} else if (um instanceof JCommand.ArrayLoad a) {
 			AbstractExpression index     = operantStack.remove(operantStack.size() - 1);
 			AbstractExpression objectref = operantStack.remove(operantStack.size() - 1);
 			AccessArray        access    = new AccessArray(a.type, objectref, index);
 			operantStack.add(access);
-			commands.add(new AbstractCommand.Access(access));
+			return new AbstractCommand.Access(access);
 		} else if (um instanceof JCommand.CheckCast cc) {
 			if (cc.fail) {
 				AbstractExpression       objectref = operantStack.get(operantStack.size() - 1);
 				List<AbstractExpression> args      = List.of(objectref, new ConstantClass(cc.type));
-				MethodInvokation<?>      cmd       = new AbstractCommand.MethodInvokation<>(CHECK_CAST, args);
-				commands.add(cmd);
-			} else {
-				AbstractExpression objectref = operantStack.remove(operantStack.size() - 1);
-				operantStack.add(new InstanceOf(objectref, cc.type));
+				return new AbstractCommand.MethodInvokation<>(CHECK_CAST, args);
 			}
+			AbstractExpression objectref = operantStack.remove(operantStack.size() - 1);
+			operantStack.add(new InstanceOf(objectref, cc.type));
+			return null;
 		} else if (um instanceof JCommand.SignCheck sc) {
 			AbstractExpression       a      = operantStack.remove(operantStack.size() - 1);
 			AbstractExpression       b      = sc instanceof JCommand.Compare ? operantStack.remove(operantStack.size() - 1) : ConstantZeroOrNull.VALUE;
@@ -149,27 +219,31 @@ public class CodeUnderstander {
 			AbstractExpression         condition = new Compare(a, sc.cmp, b);
 			AbstractCommand.GotoTarget it        = new AbstractCommand.GotoTarget(jumps.get(Integer.valueOf(sc.targetAddress())));
 			AbstractCommand.GotoTarget et        = new AbstractCommand.GotoTarget(jumps.get(Integer.valueOf(commandEnd)));
-			commands.add(new AbstractCommand.IfGoto(condition, it, et, params));
+			return new AbstractCommand.IfGoto(condition, it, et, params);
 		} else if (um instanceof JCommand.Goto g) {
 			List<AbstractExpression> params = new ArrayList<>();
 			params.addAll(operantStack);
 			params.addAll(lvl);
 			AbstractCommand.GotoTarget gt = new AbstractCommand.GotoTarget(jumps.get(Integer.valueOf(g.targetAddress())));
-			commands.add(new AbstractCommand.Goto(gt, params));
+			return new AbstractCommand.Goto(gt, params);
 		} else if (um instanceof JCommand.Const c) {
 			operantStack.add(new Constant(c.type, c.value));
+			return null;
 		} else if (um instanceof JCommand.Convert c) {
 			AbstractExpression val = operantStack.remove(operantStack.size() - 1);
 			operantStack.add(new Convert(val, c.from, c.to));
+			return null;
 		} else if (um instanceof JCommand.FPCompare fpc) {
 			AbstractExpression a = operantStack.remove(operantStack.size() - 1);
 			AbstractExpression b = operantStack.remove(operantStack.size() - 1);
 			operantStack.add(new FPCompare(a, b, fpc.type, fpc.nanValue));
+			return null;
 		} else if (um instanceof JCommand.IInc i) {
 			AbstractExpression oldVal = localVariables[i.localVarIndex];
-			Constant add = new Constant(JVMType.INT, i.addConst);
-			localVariables[i.localVarIndex] = new Math(oldVal, JVMMath.ADD, add);
-		} else if (um instanceof JCommand.InvokeDynamic) {
+			Constant           add    = new Constant(JVMType.INT, i.addConst);
+			localVariables[i.localVarIndex] = new MathCalc(oldVal, JVMMath.ADD, add);
+			return null;
+		} else if (um instanceof JCommand.InvokeDynamic id) {
 			
 		} else if (um instanceof JCommand.InvokeInterface) {
 			
@@ -210,8 +284,9 @@ public class CodeUnderstander {
 		} else if (um instanceof JCommand.TableSwitch) {
 			
 		} else {
-			throw new AssertionError("unknown ActField: " + um);
+			throw new AssertionError("unknown Command: " + um);
 		}
+		throw new UnsupportedOperationException("this command is not yet done!");
 	}
 	
 }
