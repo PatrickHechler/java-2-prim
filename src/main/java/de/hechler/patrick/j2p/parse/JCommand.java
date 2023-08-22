@@ -165,7 +165,7 @@ public abstract sealed class JCommand {
 		
 	}
 	
-	public static sealed class ActField extends JCommand {
+	public abstract static sealed class ActField extends JCommand {
 		
 		public final boolean     instance;
 		public final CPEFieldRef field;
@@ -581,6 +581,11 @@ public abstract sealed class JCommand {
 			builder.append(this.relativeAdress + super.address()).append(" : 0x").append(Long.toHexString(this.relativeAdress + super.address()));
 			builder.append("]");
 			return builder.toString();
+		}
+		
+		
+		public int targetAddress() {
+			return (int) (super.addr + this.relativeAdress);
 		}
 		
 	}

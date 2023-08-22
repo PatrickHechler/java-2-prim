@@ -113,7 +113,7 @@ public class ClassReader {
 		int        maxLocals = in.readUnsignedShort();
 		final long codeEnd   = in.readInt() & 0xFFFFFFFFL;
 		in.address(0L);
-		method.initCode(maxStack, maxLocals);
+		method.initCode(maxStack, maxLocals, (int) codeEnd);
 		while (in.address() < codeEnd) {
 			long     addr = in.address();
 			JCommand cmd  = readCommand(in, method);

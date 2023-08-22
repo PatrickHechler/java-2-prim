@@ -13,6 +13,7 @@ public class JMethod {
 	public final MethodType     methodType;
 	private int                 maxStack;
 	private int                 maxLocals;
+	private int                 codeLength;
 	private List<JCommand>      cmds;
 	private JExceptionHandler[] handlers;
 	private JStackMapEntry[]    stackMapEntries;
@@ -24,13 +25,14 @@ public class JMethod {
 		this.methodType  = methodType;
 	}
 	
-	public void initCode(int maxStack, int maxLocals) {
+	public void initCode(int maxStack, int maxLocals, int codeLength) {
 		if (this.cmds != null) {
 			throw new ClassFormatError("multiple Code attribetes registerd!");
 		}
-		this.maxStack  = maxStack;
-		this.maxLocals = maxLocals;
-		this.cmds      = new ArrayList<>();
+		this.maxStack   = maxStack;
+		this.maxLocals  = maxLocals;
+		this.codeLength = codeLength;
+		this.cmds       = new ArrayList<>();
 	}
 	
 	public void addCommand(JCommand cmd) {
@@ -94,6 +96,11 @@ public class JMethod {
 	
 	public int maxLocals() {
 		return this.maxLocals;
+	}
+	
+	
+	public int codeLength() {
+		return this.codeLength;
 	}
 	
 	public List<JCommand> commands() {
