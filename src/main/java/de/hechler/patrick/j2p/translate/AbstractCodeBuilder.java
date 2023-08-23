@@ -80,7 +80,7 @@ public class AbstractCodeBuilder {
 			case LONG:
 				return JType.JPrimType.LONG;
 			case UNINITIALIZEDTHIS:
-				return new JType.UninitMe(((JType.ObjectType) method.file.thisClass()).binaryName());
+				return method.file.thisClass();
 			case NULL:
 				return JType.NullType.TYPE;
 			case TOP:
@@ -91,7 +91,7 @@ public class AbstractCodeBuilder {
 		} else if (loc instanceof JSMEVerificationInfo.ObjectInfo oi) {
 			return oi.type();
 		} else if (loc instanceof JSMEVerificationInfo.UninitilizedInfo ui) {
-			return new JType.UninitObjectType(ui.newAddress(), findUninitType(method, ui.newAddress()));
+			return findUninitType(method, ui.newAddress());
 		} else {
 			throw new AssertionError("unknown JSMEVerificationInfo type: " + loc.getClass());
 		}

@@ -16,7 +16,7 @@ the following command types can be used
 + method invocation
     + has a target method reference
     + has a list of parameter value expressions
-+ check
++ assert
     + has a expression which is assumed to evaluate to true
     + if the expression does not evaluate to true this command fails
 + if_goto
