@@ -19,13 +19,30 @@ public abstract sealed class JCommand {
 		this.addr = addr;
 	}
 	
-	
 	public long address() {
 		if (this.addr == -1L) {
 			throw new AssertionError();
 		}
 		return this.addr;
 	}
+	
+	@Override
+	public int hashCode() {
+		final int prime  = 31;
+		int       result = 1;
+		result = prime * result + (int) (this.addr ^ (this.addr >>> 32));
+		return result;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if (obj == null) return false;
+		if (getClass() != obj.getClass()) return false;
+		JCommand other = (JCommand) obj;
+		if (this.addr != other.addr) return false;
+		return true;
+	}
+	
 	
 	@Override
 	public abstract String toString();
@@ -36,6 +53,25 @@ public abstract sealed class JCommand {
 		
 		public NewArray(JType componentType) {
 			this.componentType = componentType;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.componentType == null) ? 0 : this.componentType.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			NewArray other = (NewArray) obj;
+			if (this.componentType == null) {
+				if (other.componentType != null) return false;
+			} else if (!this.componentType.equals(other.componentType)) return false;
+			return true;
 		}
 		
 		@Override
@@ -55,6 +91,25 @@ public abstract sealed class JCommand {
 		
 		public InvokeNormal(CPEntry.CPENormalMethodRef invoke) {
 			this.invoke = invoke;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.invoke == null) ? 0 : this.invoke.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			InvokeNormal other = (InvokeNormal) obj;
+			if (this.invoke == null) {
+				if (other.invoke != null) return false;
+			} else if (!this.invoke.equals(other.invoke)) return false;
+			return true;
 		}
 		
 		@Override
@@ -109,6 +164,25 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.invoke == null) ? 0 : this.invoke.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			InvokeDynamic other = (InvokeDynamic) obj;
+			if (this.invoke == null) {
+				if (other.invoke != null) return false;
+			} else if (!this.invoke.equals(other.invoke)) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("InvokeDynamic [invoke=");
@@ -127,6 +201,25 @@ public abstract sealed class JCommand {
 		public FPCompare(JVMType type, int nanValue) {
 			this.type     = type;
 			this.nanValue = nanValue;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.nanValue;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			FPCompare other = (FPCompare) obj;
+			if (this.nanValue != other.nanValue) return false;
+			if (this.type != other.type) return false;
+			return true;
 		}
 		
 		@Override
@@ -153,6 +246,25 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = super.hashCode();
+			result = prime * result + this.dupCnt;
+			result = prime * result + this.skip;
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			StackDup other = (StackDup) obj;
+			if (this.dupCnt != other.dupCnt) return false;
+			if (this.skip != other.skip) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("StackDup [skip=");
@@ -173,6 +285,27 @@ public abstract sealed class JCommand {
 		public ActField(boolean instance, CPEntry.CPEFieldRef field) {
 			this.instance = instance;
 			this.field    = field;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.field == null) ? 0 : this.field.hashCode());
+			result = prime * result + (this.instance ? 1231 : 1237);
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			ActField other = (ActField) obj;
+			if (this.field == null) {
+				if (other.field != null) return false;
+			} else if (!this.field.equals(other.field)) return false;
+			if (this.instance != other.instance) return false;
+			return true;
 		}
 		
 		@Override
@@ -215,6 +348,25 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.addConst;
+			result = prime * result + this.localVarIndex;
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			IInc other = (IInc) obj;
+			if (this.addConst != other.addConst) return false;
+			if (this.localVarIndex != other.localVarIndex) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("IInc [localVarIndex=");
@@ -237,6 +389,27 @@ public abstract sealed class JCommand {
 			this.defaultOffset = defaultOffset;
 			this.matches       = matches;
 			this.offsets       = offsets;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.defaultOffset;
+			result = prime * result + Arrays.hashCode(this.matches);
+			result = prime * result + Arrays.hashCode(this.offsets);
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			LookupSwitch other = (LookupSwitch) obj;
+			if (this.defaultOffset != other.defaultOffset) return false;
+			if (!Arrays.equals(this.matches, other.matches)) return false;
+			if (!Arrays.equals(this.offsets, other.offsets)) return false;
+			return true;
 		}
 		
 		@Override
@@ -269,6 +442,29 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.defaultOffset;
+			result = prime * result + this.maxValue;
+			result = prime * result + this.minValue;
+			result = prime * result + Arrays.hashCode(this.offsets);
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			TableSwitch other = (TableSwitch) obj;
+			if (this.defaultOffset != other.defaultOffset) return false;
+			if (this.maxValue != other.maxValue) return false;
+			if (this.minValue != other.minValue) return false;
+			if (!Arrays.equals(this.offsets, other.offsets)) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("TableSwitch [defaultOffset=");
@@ -296,6 +492,25 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.from == null) ? 0 : this.from.hashCode());
+			result = prime * result + ((this.to == null) ? 0 : this.to.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			Convert other = (Convert) obj;
+			if (this.from != other.from) return false;
+			if (this.to != other.to) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("Convert [from=");
@@ -316,6 +531,27 @@ public abstract sealed class JCommand {
 		public CheckCast(JType type, boolean fail) {
 			this.type = type;
 			this.fail = fail;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + (this.fail ? 1231 : 1237);
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			CheckCast other = (CheckCast) obj;
+			if (this.fail != other.fail) return false;
+			if (this.type == null) {
+				if (other.type != null) return false;
+			} else if (!this.type.equals(other.type)) return false;
+			return true;
 		}
 		
 		@Override
@@ -342,6 +578,25 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			result = prime * result + (int) (this.value ^ (this.value >>> 32));
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			Const other = (Const) obj;
+			if (this.type != other.type) return false;
+			if (this.value != other.value) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("Const [type=");
@@ -362,6 +617,25 @@ public abstract sealed class JCommand {
 		public LocalVariableLoad(JVMType type, int index) {
 			this.type  = type;
 			this.index = index;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.index;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			LocalVariableLoad other = (LocalVariableLoad) obj;
+			if (this.index != other.index) return false;
+			if (this.type != other.type) return false;
+			return true;
 		}
 		
 		@Override
@@ -388,6 +662,25 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.index;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			LocalVariableStore other = (LocalVariableStore) obj;
+			if (this.index != other.index) return false;
+			if (this.type != other.type) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("LocalVariableStore [type=");
@@ -411,6 +704,25 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.op == null) ? 0 : this.op.hashCode());
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			PrimMath other = (PrimMath) obj;
+			if (this.op != other.op) return false;
+			if (this.type != other.type) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("PrimMath [type=");
@@ -425,12 +737,33 @@ public abstract sealed class JCommand {
 	
 	public static final class MultiNewArray extends JCommand {
 		
-		public final JType type;
-		public final int   dimensions;
+		public final JType.ArrayType type;
+		public final int             dimensions;
 		
-		public MultiNewArray(JType type, int dimensions) {
+		public MultiNewArray(JType.ArrayType type, int dimensions) {
 			this.type       = type;
 			this.dimensions = dimensions;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.dimensions;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			MultiNewArray other = (MultiNewArray) obj;
+			if (this.dimensions != other.dimensions) return false;
+			if (this.type == null) {
+				if (other.type != null) return false;
+			} else if (!this.type.equals(other.type)) return false;
+			return true;
 		}
 		
 		@Override
@@ -448,21 +781,76 @@ public abstract sealed class JCommand {
 	
 	public static final class Push extends JCommand {
 		
-		public final int bytes;
-		public final int value;
+		public final JVMType type;
+		public final int     value;
 		
-		public Push(int bytes, int value) {
-			this.bytes = bytes;
+		public Push(JVMType type, int value) {
+			this.type  = type;
 			this.value = value;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			result = prime * result + this.value;
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			Push other = (Push) obj;
+			if (this.type != other.type) return false;
+			if (this.value != other.value) return false;
+			return true;
 		}
 		
 		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
-			builder.append("Push [size (in bytes)=");
-			builder.append(this.bytes);
+			builder.append("Push [type=");
+			builder.append(this.type);
 			builder.append(", value=");
 			builder.append(this.value);
+			builder.append("]");
+			return builder.toString();
+		}
+		
+	}
+	
+	public static final class Pop extends JCommand {
+		
+		public final int pops;
+		
+		public Pop(int pops) {
+			this.pops = pops;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.pops;
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			Pop other = (Pop) obj;
+			if (this.pops != other.pops) return false;
+			return true;
+		}
+		
+		@Override
+		public String toString() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("Pop [pops=");
+			builder.append(this.pops);
 			builder.append("]");
 			return builder.toString();
 		}
@@ -475,6 +863,25 @@ public abstract sealed class JCommand {
 		
 		public New(JType type) {
 			this.type = type;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			New other = (New) obj;
+			if (this.type == null) {
+				if (other.type != null) return false;
+			} else if (!this.type.equals(other.type)) return false;
+			return true;
 		}
 		
 		@Override
@@ -497,6 +904,23 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			Return other = (Return) obj;
+			if (this.type != other.type) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("Return [type=");
@@ -513,6 +937,23 @@ public abstract sealed class JCommand {
 		
 		public ArrayLoad(JVMType type) {
 			this.type = type;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			ArrayLoad other = (ArrayLoad) obj;
+			if (this.type != other.type) return false;
+			return true;
 		}
 		
 		@Override
@@ -535,6 +976,23 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			ArrayStore other = (ArrayStore) obj;
+			if (this.type != other.type) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("ArrayStore [type=");
@@ -551,6 +1009,25 @@ public abstract sealed class JCommand {
 		
 		public LoadConstPool(CPEntry entry) {
 			this.entry = entry;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.entry == null) ? 0 : this.entry.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			LoadConstPool other = (LoadConstPool) obj;
+			if (this.entry == null) {
+				if (other.entry != null) return false;
+			} else if (!this.entry.equals(other.entry)) return false;
+			return true;
 		}
 		
 		@Override
@@ -573,6 +1050,23 @@ public abstract sealed class JCommand {
 		}
 		
 		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + this.relativeAdress;
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			Goto other = (Goto) obj;
+			if (this.relativeAdress != other.relativeAdress) return false;
+			return true;
+		}
+		
+		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("Goto [relativeAdress=");
@@ -582,7 +1076,6 @@ public abstract sealed class JCommand {
 			builder.append("]");
 			return builder.toString();
 		}
-		
 		
 		public int targetAddress() {
 			return (int) (super.addr + this.relativeAdress);
@@ -599,6 +1092,26 @@ public abstract sealed class JCommand {
 			super(relativeAdress);
 			this.type = type;
 			this.cmp  = cmp;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = super.hashCode();
+			result = prime * result + ((this.cmp == null) ? 0 : this.cmp.hashCode());
+			result = prime * result + ((this.type == null) ? 0 : this.type.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			if (!(obj instanceof SignCheck)) return false;
+			SignCheck other = (SignCheck) obj;
+			if (this.cmp != other.cmp) return false;
+			if (this.type != other.type) return false;
+			return true;
 		}
 		
 		@Override
@@ -627,12 +1140,10 @@ public abstract sealed class JCommand {
 	}
 	
 	public enum SimpleCommands {
-		// class checking
-		CHECK_CASTS, INSTANCE_OF,
 		// synchronizing
 		MONITOR_ENTER, MONITOR_EXIT,
 		// miscellaneous
-		ARRAY_LENGTH, A_THROW, LONG_COMPARE, NOP, POP, SWAP,
+		ARRAY_LENGTH, A_THROW, LONG_COMPARE, NOP, SWAP,
 	
 	}
 	
@@ -642,6 +1153,24 @@ public abstract sealed class JCommand {
 		
 		public SimpleCommand(SimpleCommands commandType) {
 			this.commandType = commandType;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime  = 31;
+			int       result = 1;
+			result = prime * result + ((this.commandType == null) ? 0 : this.commandType.hashCode());
+			return result;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!super.equals(obj)) return false;
+			if (!(obj instanceof SimpleCommand)) return false;
+			SimpleCommand other = (SimpleCommand) obj;
+			if (this.commandType != other.commandType) return false;
+			return true;
 		}
 		
 		@Override

@@ -365,7 +365,7 @@ public sealed interface CPEntry {
 			} else if (this.imref != null) {
 				throw new AssertionError();
 			} else {
-				if (this.refKind < 4 || this.refKind > 8) {
+				if (this.refKind < 5 || this.refKind > 8) {
 					throw new AssertionError();
 				}
 				this.mref = m;
@@ -380,7 +380,7 @@ public sealed interface CPEntry {
 			} else if (this.mref != null) {
 				throw new AssertionError();
 			} else {
-				if (this.refKind < 5 || this.refKind == 8) {
+				if (this.refKind < 6 || this.refKind == 8) {
 					throw new AssertionError();
 				}
 				this.imref = im;
@@ -418,9 +418,87 @@ public sealed interface CPEntry {
 		
 	}
 	
-	record CPEDynamic(int bootstrapMetAttrIndex, int nameAndTypeIndex) implements CPEntry {}
+	final class CPEDynamic implements CPEntry {
+		
+		public final int bootstrapMetAttrIndex;
+		public final int nameAndTypeIndex;
+		private String   name;
+		private JType    fieldType;
+		
+		
+		public CPEDynamic(int bootstrapMetAttrIndex, int nameAndTypeIndex) {
+			this.bootstrapMetAttrIndex = bootstrapMetAttrIndex;
+			this.nameAndTypeIndex      = nameAndTypeIndex;
+		}
+		
+		
+		public void initFieldType(String name, JType fieldType) {
+			if (this.fieldType != null) {
+				if (!this.name.equals(name) || !this.fieldType.equals(fieldType)) {
+					throw new AssertionError();
+				}
+				return;
+			}
+			this.name      = name;
+			this.fieldType = fieldType;
+		}
+		
+		public String name() {
+			if (this.name == null) {
+				throw new AssertionError();
+			}
+			return this.name;
+		}
+		
+		public JType fieldType() {
+			if (this.fieldType == null) {
+				throw new AssertionError();
+			}
+			return this.fieldType;
+		}
+		
+	}
 	
-	record CPEInvokeDynamic(int bootstrapMetAttrIndex, int nameAndTypeIndex) implements CPEntry {}
+	final class CPEInvokeDynamic implements CPEntry {
+		
+		public final int   bootstrapMetAttrIndex;
+		public final int   nameAndTypeIndex;
+		private String     name;
+		private MethodType methodType;
+		
+		
+		public CPEInvokeDynamic(int bootstrapMetAttrIndex, int nameAndTypeIndex) {
+			this.bootstrapMetAttrIndex = bootstrapMetAttrIndex;
+			this.nameAndTypeIndex      = nameAndTypeIndex;
+		}
+		
+		
+		public void initMethodType(String name, MethodType methodType) {
+			if (this.methodType != null) {
+				if (!this.name.equals(name) || !this.methodType.equals(methodType)) {
+					throw new AssertionError();
+				}
+				return;
+			}
+			this.name       = name;
+			this.methodType = methodType;
+		}
+		
+		public String name() {
+			if (this.name == null) {
+				throw new AssertionError();
+			}
+			return this.name;
+		}
+		
+		public MethodType methodType() {
+			if (this.methodType == null) {
+				throw new AssertionError();
+			}
+			return this.methodType;
+		}
+		
+	}
 	
 	final class CPEModule implements CPEntry {
 		

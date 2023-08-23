@@ -16,9 +16,16 @@ the following command types can be used
 + method invocation
     + has a target method reference
     + has a list of parameter value expressions
++ new
+    + object creation
 + assert
     + has a expression which is assumed to evaluate to true
     + if the expression does not evaluate to true this command fails
++ switch_goto
+    + has a expression
+    + has a default target abstract code block
+    + has a map of expression to abstract code blocks
+    + has a list of parameter expression for the target
 + if_goto
     + has a condition
     + has a two target abstract code blocks

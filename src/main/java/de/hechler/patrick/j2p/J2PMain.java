@@ -5,10 +5,15 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import de.hechler.patrick.j2p.parse.AlignableDataInput;
 import de.hechler.patrick.j2p.parse.ClassFile;
 import de.hechler.patrick.j2p.parse.ClassReader;
+import de.hechler.patrick.j2p.parse.JMethod;
+import de.hechler.patrick.j2p.translate.AbstractCodeBuilder;
+import de.hechler.patrick.j2p.translate.CodeUnderstander;
 
 @SuppressWarnings("javadoc")
 public class J2PMain {
@@ -36,11 +41,19 @@ public class J2PMain {
 			}
 		}
 		ClassReader reader = new ClassReader();
+		CodeUnderstander cu = new CodeUnderstander();
 		for (String file : files) {
 			try (AlignableDataInput in = new AlignableDataInput(new FileInputStream(file))) {
+				System.out.println("parse now: " + file);
 				ClassFile f = reader.read(in);
-				System.out.println("file: " + file);
 				System.out.println(f);
+				for (JMethod m : f.methods()) {
+					System.out.println("understand now: " + f.thisClass() + " # " + m.name + " : " + m.methodType);
+					Map<Integer, AbstractCodeBuilder> map = cu.understand(m);
+					for (AbstractCodeBuilder acb : map.values()) {
+						acb.print(System.out);
+					}
+				}
 			}
 		}
 	}

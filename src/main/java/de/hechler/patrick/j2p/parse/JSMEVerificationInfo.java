@@ -20,7 +20,10 @@ public sealed interface JSMEVerificationInfo {
 	
 	public record UninitilizedInfo(int newAddress) implements JSMEVerificationInfo {}
 	
-	ObjectInfo CLASS_TYPE = new JSMEVerificationInfo.ObjectInfo(new JType.ObjectType("java/lang/Class"));
+	ObjectInfo METHOD_TYPE_TYPE = new JSMEVerificationInfo.ObjectInfo(new JType.ObjectType("java/lang/invoke/MethodType"));
+	ObjectInfo METHOD_HANDLE_TYPE = new JSMEVerificationInfo.ObjectInfo(new JType.ObjectType("java/lang/invoke/MethodHandle"));
+	ObjectInfo STRING_TYPE = new JSMEVerificationInfo.ObjectInfo(new JType.ObjectType("java/lang/String"));
+	ObjectInfo CLASS_TYPE  = new JSMEVerificationInfo.ObjectInfo(new JType.ObjectType("java/lang/Class"));
 	ObjectInfo OBJECT_TYPE = new JSMEVerificationInfo.ObjectInfo(new JType.ObjectType("java/lang/Object"));
 	
 }

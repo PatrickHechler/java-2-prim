@@ -41,12 +41,12 @@ public class ClassReader {
 						ba[bai] = f.cp(CPEntry.class, in.readUnsignedShort());
 					}
 					if (e instanceof CPEntry.CPEInvokeDynamic id) {
-						if (id.bootstrapMetAttrIndex() != bmi) {
+						if (id.bootstrapMetAttrIndex != bmi) {
 							throw new ClassFormatError("the bootstrap entry refers to a invoke dynamic entry which refers to a different bootstrap entry!");
 						}
 						bootstrapMethods[bmi] = new JBootstrap.InvokeDynamic(id, ba);
 					} else if (e instanceof CPEntry.CPEDynamic d) {
-						if (d.bootstrapMetAttrIndex() != bmi) {
+						if (d.bootstrapMetAttrIndex != bmi) {
 							throw new ClassFormatError("the bootstrap entry refers to a dynamic entry which refers to a different bootstrap entry!");
 						}
 						bootstrapMethods[bmi] = new JBootstrap.Dynamic(d, ba);
@@ -638,7 +638,7 @@ public class ClassReader {
 			throw new ClassFormatError("invalid type of class path entry for ldc operation");
 		}
 		if (entry instanceof CPEntry.CPEDynamic d) {
-			CPENameAndType nt       = method.file.cp(CPEntry.CPENameAndType.class, d.nameAndTypeIndex());
+			CPENameAndType nt       = method.file.cp(CPEntry.CPENameAndType.class, d.nameAndTypeIndex);
 			boolean        twoSized = nt.type() == JType.JPrimType.LONG || nt.type() == JType.JPrimType.DOUBLE;
 			if ((constSize == 1 && twoSized) || (constSize == 2 && !twoSized)) {
 				throw new ClassFormatError("invalid type of dynamic class path entry for ldc operation");
@@ -708,7 +708,7 @@ public class ClassReader {
 			}
 			t = at;
 		}
-		return new JCommand.MultiNewArray(type, dimensions);
+		return new JCommand.MultiNewArray((JType.ArrayType) type, dimensions); // safe cast because of previous check
 	}
 	
 	private static JCommand readNew(AlignableDataInput in, JMethod method) throws IOException {
@@ -726,7 +726,7 @@ public class ClassReader {
 	
 	@SuppressWarnings("unused")
 	private static JCommand readPOP(AlignableDataInput in, JMethod method, int pops) {
-		return new JCommand.SimpleCommand(SimpleCommands.POP);
+		return new JCommand.Pop(pops);
 	}
 	
 	private static JCommand readPutField(AlignableDataInput in, JMethod method) throws IOException {
@@ -760,21 +760,18 @@ public class ClassReader {
 	@SuppressWarnings("unused")
 	private static JCommand readPush(AlignableDataInput in, JMethod method, JVMType type) throws IOException {
 		int value;
-		int bytes;
 		switch (type) {
 		case BYTE_BOOL:
 			value = in.readUnsignedByte();
-			bytes = 1;
 			break;
 		case SHORT:
 			value = in.readUnsignedShort();
-			bytes = 2;
 			break;
 		// $CASES-OMITTED$
 		default:
 			throw new AssertionError();
 		}
-		return new JCommand.Push(bytes, value);
+		return new JCommand.Push(type, value);
 	}
 	
 	@SuppressWarnings("unused")
@@ -909,7 +906,9 @@ public class ClassReader {
 	}
 	
 	private static void finishCPEntry(int minor, int major, CPEntry cpe, ClassFile f) throws IOException {
-		if (cpe instanceof CPEntry.CPEClass e) {
+		if (cpe instanceof CPEntry.CPEString e) {
+			e.initStr(f.cp(CPEntry.CPEUtf8.class, e.nameIndex).val());
+		} else if (cpe instanceof CPEntry.CPEClass e) {
 			String str = f.cp(CPEntry.CPEUtf8.class, e.nameIndex).val();
 			JType  t   = str.charAt(0) == '[' ? readType(str, false) : new JType.ObjectType(str);
 			e.initType(t);
@@ -983,8 +982,14 @@ public class ClassReader {
 			}
 		} else if (cpe instanceof CPEntry.CPEPackage e) {
 			e.initName(f.cp(CPEntry.CPEUtf8.class, e.nameIndex).val());
-		} else if (cpe instanceof CPEntry.CPEString e) {
-			e.initStr(f.cp(CPEntry.CPEUtf8.class, e.nameIndex).val());
+		} else if (cpe instanceof CPEntry.CPEInvokeDynamic e) {
+			CPENameAndType nt = f.cp(CPEntry.CPENameAndType.class, e.nameAndTypeIndex);
+			finishCPEntry(minor, major, nt, f);
+			e.initMethodType(nt.name(), nt.mtype());
+		} else if (cpe instanceof CPEntry.CPEDynamic e) {
+			CPENameAndType nt = f.cp(CPEntry.CPENameAndType.class, e.nameAndTypeIndex);
+			finishCPEntry(minor, major, nt, f);
+			e.initFieldType(nt.name(), nt.type());
 		}
 	}
 	

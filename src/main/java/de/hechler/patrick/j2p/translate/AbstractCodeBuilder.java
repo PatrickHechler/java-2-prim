@@ -1,5 +1,6 @@
 package de.hechler.patrick.j2p.translate;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,14 +13,21 @@ import de.hechler.patrick.j2p.parse.JType;
 @SuppressWarnings("javadoc")
 public class AbstractCodeBuilder {
 	
+	public static final AbstractExpression PARAM_SEPERATOR = new AbstractExpression() {/**/};
+	
 	public final List<AbstractCommand>    commands = new ArrayList<>();
 	public final List<AbstractExpression> operantStack;
 	public final AbstractExpression[]     localVariables;
 	private boolean                       initilized;
+	private String                        name;
 	
 	public AbstractCodeBuilder(JMethod method) {
 		this.operantStack   = new ArrayList<>(method.maxStack());
 		this.localVariables = new AbstractExpression[method.maxLocals()];
+	}
+	
+	public void setName(String name) {
+		this.name = name;
 	}
 	
 	public void initParameters(JSMEVerificationInfo[] locs, List<JSMEVerificationInfo> stack, JMethod method) {
@@ -107,6 +115,19 @@ public class AbstractCodeBuilder {
 			if (c.address() != na) throw new ClassFormatError("the newAddress does not exist");
 			if (!(c instanceof JCommand.New n)) throw new ClassFormatError("the command at the new address is no new instruction");
 			return n.type;
+		}
+	}
+	
+	@Override
+	public String toString() {
+		String n = this.name;
+		return n == null ? "unnamed abstract code builder" : n;
+	}
+	
+	public void print(PrintStream out) {
+		out.println("Abstract Code: " + toString());
+		for (AbstractCommand cmd : this.commands) {
+			out.println("  " + cmd);
 		}
 	}
 	

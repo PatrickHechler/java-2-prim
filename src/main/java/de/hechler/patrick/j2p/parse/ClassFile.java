@@ -115,10 +115,6 @@ public class ClassFile {
 		}
 	}
 	
-	public CPEntry[] gonstantPool() {
-		return this.constantPool;
-	}
-	
 	public int accessFlags() {
 		return this.accessFlags;
 	}
@@ -134,9 +130,13 @@ public class ClassFile {
 	public JType[] interfaces() {
 		return this.interfaces;
 	}
-	
+
 	public JField[] fields() {
 		return this.fields;
+	}
+	
+	public JMethod[] methods() {
+		return this.methods;
 	}
 	
 	public JBootstrap bootstrapMethod(int index) {
