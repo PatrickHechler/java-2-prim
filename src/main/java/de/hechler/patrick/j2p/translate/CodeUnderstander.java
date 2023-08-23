@@ -9,20 +9,18 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.function.Function;
 
-import org.stringtemplate.v4.compiler.STParser.memberExpr_return;
-
 import de.hechler.patrick.j2p.parse.CPEntry;
 import de.hechler.patrick.j2p.parse.ClassReader.JVMCmp;
 import de.hechler.patrick.j2p.parse.ClassReader.JVMMath;
 import de.hechler.patrick.j2p.parse.ClassReader.JVMType;
 import de.hechler.patrick.j2p.parse.JCommand;
+import de.hechler.patrick.j2p.parse.JCommand.Return;
 import de.hechler.patrick.j2p.parse.JExceptionHandler;
 import de.hechler.patrick.j2p.parse.JMethod;
 import de.hechler.patrick.j2p.parse.JSMEVerificationInfo;
 import de.hechler.patrick.j2p.parse.JStackMapEntry;
 import de.hechler.patrick.j2p.parse.JStackMapEntry.FullDescribtion;
 import de.hechler.patrick.j2p.parse.JType;
-import de.hechler.patrick.j2p.translate.AbstractCommand.Goto;
 
 @SuppressWarnings("javadoc")
 public class CodeUnderstander {
@@ -80,10 +78,16 @@ public class CodeUnderstander {
 	private static Map<Integer, AbstractCodeBuilder> initJumps(JMethod method) {
 		Map<Integer, AbstractCodeBuilder>      jumps = new TreeMap<>((a, b) -> Integer.compareUnsigned(a.intValue(), b.intValue()));
 		Function<Integer, AbstractCodeBuilder> cia   = i -> new AbstractCodeBuilder(method);
+		boolean una=false;
 		for (JCommand cmd : method.commands()) {
+			if (una) {
+				una = false;
+				jumps.computeIfAbsent(Integer.valueOf((int) cmd.address()), cia);
+			}
 			if (cmd instanceof JCommand.Goto g) {
 				jumps.computeIfAbsent(Integer.valueOf(g.targetAddress()), cia);
-			}
+				una = true;
+			} else if (cmd instanceof Return) una = true;
 		}
 		if (method.handlers() != null) {
 			for (JExceptionHandler cmd : method.handlers()) {
@@ -151,12 +155,16 @@ public class CodeUnderstander {
 					return cmdListIndex;
 				}
 				if (addCmd instanceof AbstractCommand.IfGoto ig) {
-					if (!ig.elseTarget().nonFinalTarget().initilized()) {
-						initilize(method, ig.elseTarget().nonFinalTarget(), acb);
+					if (!ig.elseTarget().nonFinalTarget().initilized() || !ig.ifTarget().nonFinalTarget().initilized()) {
+						FullDescribtion desc = generateFullDesc(method, acb);
+						if (!ig.elseTarget().nonFinalTarget().initilized()) {
+							ig.elseTarget().nonFinalTarget().initParameters(desc, method);
+						}
+						if (!ig.ifTarget().nonFinalTarget().initilized()) {
+							ig.ifTarget().nonFinalTarget().initParameters(desc, method);
+						}
 					}
-					if (!ig.ifTarget().nonFinalTarget().initilized()) {
-						initilize(method, ig.ifTarget().nonFinalTarget(), acb);
-					}
+					return cmdListIndex;
 				}
 			}
 		} while (cmd.address() < endAddressLong);
@@ -164,19 +172,27 @@ public class CodeUnderstander {
 		return cmdListIndex;
 	}
 	
-	private static void initilize(JMethod method, AbstractCodeBuilder init, AbstractCodeBuilder from) {
+	private static FullDescribtion generateFullDesc(JMethod method, AbstractCodeBuilder from) {
 		JSMEVerificationInfo[]     locs;
 		List<JSMEVerificationInfo> stack = new ArrayList<>(Math.min(method.maxStack(), from.operantStack.size() << 1));
 		int                        len;
-		for (len = from.localVariables.length; from.localVariables[len-1] == null ;len--);
-		AbstractExpression ae = from.localVariables[len-1];
-		if (ae instanceof Constant c && (c.type == JVMType.LONG || c.type == JVMType.DOUBLE)
-				|| ae instanceof AccessField f && (f.field.cls() == JType.JPrimType.LONG || f.field.cls() == JType.JPrimType.DOUBLE)
-				// TODO complete if
-				) {
-			len ++;
-		}
+		for (len = from.localVariables.length; from.localVariables[len - 1] == null; len--);
+		if (bigJavaType(from.localVariables[len - 1])) len++;
+		
 		// TODO finish method
+	}
+	
+	private static boolean bigJavaType(AbstractExpression ae) {
+		if (ae instanceof Constant c) return c.type == JVMType.LONG || c.type == JVMType.DOUBLE;
+		if (ae instanceof AccessField f) return f.field.cls() == JType.JPrimType.LONG || f.field.cls() == JType.JPrimType.DOUBLE;
+		if (ae instanceof AccessArray f) return f.atype == JVMType.LONG || f.atype == JVMType.DOUBLE;
+		if (ae instanceof Parameter p) return p.parameterType == JType.JPrimType.LONG || p.parameterType == JType.JPrimType.DOUBLE;
+		if (ae instanceof MathCalc m) return bigJavaType(m.a);
+		if (ae instanceof Convert c) return c.to == JVMType.LONG || c.to == JVMType.DOUBLE;
+		if (ae instanceof FPCompare) return false;
+		if (ae instanceof InstanceOf) return false;
+		if (ae instanceof ConstantClass) return false;
+		throw new AssertionError("unknown expression type: " + ae.getClass());
 	}
 	
 	private static AbstractCommand understandCommand(List<AbstractExpression> operantStack, AbstractExpression[] localVariables, List<AbstractExpression> lvl,
