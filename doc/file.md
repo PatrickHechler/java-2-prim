@@ -1,12 +1,12 @@
 # Java-2-Prim
 the [Constants](#constants) section defines Constants.    
 the [Method call](#method-call) section describes how natives code has to invoke java code, how native code is invoked by java code and how java code invokes other java methods.    
-the [_JNI-Env_](#_jni-env_) section list all operations of the _JNI-Env_.
+the [_JNI-Env_](#_jni-env_) section list all operations of the _JNI-Env_.    
 the [Class Loading](#class-loading) section describes how classes are loaded and found    
 the [Method excecution](#method-excecution) section describes how java methods are executed.    
 the [Initialisation](#initialization) section describes how _pvm-java_ can be initilized.    
 
-## Constants
+## Error Constants
 + `ERR_JAVA_THROW` : `17` : `HEX-11`
     + this constant indicates that an java exception is currently thrown
 + `ERR_JAVA_NO_SUCH_CLASS` : `18` : `HEX-12`
@@ -84,7 +84,7 @@ when returning from java code to native code _pvm-java_ __must__ save a referenc
 the _JNI-Env_ pointer is usually stored in the `X1F` register (see [Method Call](#method-call)).
 
 note that no operation allows any of its reference parameters to be invalid or `null` (`-1`) unless otherwise noted.    
-If any reference is invalid (or `null` (`-1)) the behavior is undefined.    
+If any reference is invalid (or `null` (`-1`)) the behavior is undefined.    
 a weak references become invalid when the instance which its target becomes garbage collected
 
 Operations:
