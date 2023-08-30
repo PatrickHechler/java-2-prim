@@ -3,10 +3,16 @@ package de.hechler.patrick.j2p.translate;
 import java.util.List;
 import java.util.Objects;
 
+import de.hechler.patrick.j2p.translate.CodeUnderstander.AgeExp;
+
 @SuppressWarnings("javadoc")
 public sealed interface AbstractCommand {
 	
-	record Assign(AbstractExpression target, AbstractExpression value) implements AbstractCommand {
+	default CodeUnderstander.AgeCmd age(int age) {
+		return new CodeUnderstander.AgeCmd(this, age);
+	}
+	
+	record Assign(AgeExp target, AgeExp value) implements AbstractCommand {
 		
 		public Assign {
 			Objects.requireNonNull(target, "target");
@@ -15,7 +21,7 @@ public sealed interface AbstractCommand {
 		
 	}
 	
-	record Access(AbstractExpression.AccessableValue access) implements AbstractCommand {
+	record Access(AgeExp access) implements AbstractCommand {
 		
 		public Access {
 			Objects.requireNonNull(access, "access");
@@ -23,16 +29,16 @@ public sealed interface AbstractCommand {
 		
 	}
 	
-	record MethodInvokation<I>(I methodIdentifier, List<AbstractExpression> parameters) implements AbstractCommand {
+	record MethodInvokation<I>(I methodIdentifier, List<AgeExp> parameters) implements AbstractCommand {
 		
-		public MethodInvokation(I methodIdentifier, List<AbstractExpression> parameters) {
+		public MethodInvokation(I methodIdentifier, List<AgeExp> parameters) {
 			this.methodIdentifier = Objects.requireNonNull(methodIdentifier, "identifier");
 			this.parameters       = List.copyOf(parameters);
 		}
 		
 	}
 	
-	record New(AbstractExpression newValue) implements AbstractCommand {
+	record New(AgeExp newValue) implements AbstractCommand {
 		
 		public New {
 			Objects.requireNonNull(newValue, "newValue");
@@ -40,7 +46,7 @@ public sealed interface AbstractCommand {
 		
 	}
 	
-	record Assert<I>(I info, AbstractExpression assumeValid) implements AbstractCommand {
+	record Assert<I>(I info, AgeExp assumeValid) implements AbstractCommand {
 		
 		public Assert {
 			Objects.requireNonNull(info, "info");
@@ -49,9 +55,11 @@ public sealed interface AbstractCommand {
 		
 	}
 	
-	record Switch<I>(AbstractExpression value, I mapper, List<AbstractExpression> params) implements AbstractCommand {
+	record Return(AgeExp returnValueOrNull) implements AbstractCommand {}
+	
+	record Switch<I>(AgeExp value, I mapper, List<AgeExp> params) implements AbstractCommand {
 		
-		public Switch(AbstractExpression value, I mapper, List<AbstractExpression> params) {
+		public Switch(AgeExp value, I mapper, List<AgeExp> params) {
 			this.value  = Objects.requireNonNull(value, "value");
 			this.mapper = Objects.requireNonNull(mapper, "mapper");
 			this.params = List.copyOf(params);
@@ -59,9 +67,9 @@ public sealed interface AbstractCommand {
 		
 	}
 	
-	record IfGoto(AbstractExpression condition, GotoTarget ifTarget, GotoTarget elseTarget, List<AbstractExpression> params) implements AbstractCommand {
+	record IfGoto(AgeExp condition, GotoTarget ifTarget, GotoTarget elseTarget, List<AgeExp> params) implements AbstractCommand {
 		
-		public IfGoto(AbstractExpression condition, GotoTarget ifTarget, GotoTarget elseTarget, List<AbstractExpression> params) {
+		public IfGoto(AgeExp condition, GotoTarget ifTarget, GotoTarget elseTarget, List<AgeExp> params) {
 			this.condition  = Objects.requireNonNull(condition, "condition");
 			this.ifTarget   = Objects.requireNonNull(ifTarget, "ifTarget");
 			this.elseTarget = Objects.requireNonNull(elseTarget, "elseTarget");
@@ -71,9 +79,9 @@ public sealed interface AbstractCommand {
 		
 	}
 	
-	record Goto(GotoTarget target, List<AbstractExpression> params) implements AbstractCommand {
+	record Goto(GotoTarget target, List<AgeExp> params) implements AbstractCommand {
 		
-		public Goto(GotoTarget target, List<AbstractExpression> params) {
+		public Goto(GotoTarget target, List<AgeExp> params) {
 			this.target = Objects.requireNonNull(target, "target");
 			this.params = List.copyOf(params);
 		}
@@ -124,7 +132,5 @@ public sealed interface AbstractCommand {
 		}
 		
 	}
-	
-	record Return(AbstractExpression returnValueOrNull) implements AbstractCommand {}
 	
 }

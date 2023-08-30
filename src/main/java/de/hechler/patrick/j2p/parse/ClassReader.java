@@ -257,7 +257,7 @@ public class ClassReader {
 		return switch (b) {
 		case 0x00 -> readNOP(in, method);
 		case 0x01 -> readConst(in, method, JVMType.REFERENCE, 0L);
-		case 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 -> readConst(in, method, JVMType.INT, (0x03 - b)); // 0x02 is -1
+		case 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 -> readConst(in, method, JVMType.INT, (b - 0x03)); // 0x02 is -1
 		case 0x09 -> readConst(in, method, JVMType.LONG, 0L);
 		case 0x0A -> readConst(in, method, JVMType.LONG, 1L);
 		case 0x0B -> readConst(in, method, JVMType.DOUBLE, Float.floatToRawIntBits(0F));
@@ -281,7 +281,7 @@ public class ClassReader {
 		case 0x17 -> readLocalVariableLoad(in, method, JVMType.FLOAT, -1, false); // modifiable by wide
 		case 0x18 -> readLocalVariableLoad(in, method, JVMType.DOUBLE, -1, false); // modifiable by wide
 		case 0x19 -> readLocalVariableLoad(in, method, JVMType.REFERENCE, -1, false); // modifiable by wide
-		case 0x1A, 0x1B, 0x1C, 0x1D -> readLocalVariableLoad(in, method, JVMType.FLOAT, b - 0x1A, false);
+		case 0x1A, 0x1B, 0x1C, 0x1D -> readLocalVariableLoad(in, method, JVMType.INT, b - 0x1A, false);
 		case 0x1E, 0x1F -> readLocalVariableLoad(in, method, JVMType.LONG, b - 0x1E, false);
 		default -> throw new ClassFormatError("unknown command: " + b + " : 0x" + Integer.toHexString(b));
 		};

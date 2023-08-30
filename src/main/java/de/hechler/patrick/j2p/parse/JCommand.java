@@ -1,5 +1,6 @@
 package de.hechler.patrick.j2p.parse;
 
+import java.lang.StackWalker.Option;
 import java.util.Arrays;
 
 import de.hechler.patrick.j2p.parse.CPEntry.CPEFieldRef;
@@ -21,7 +22,10 @@ public abstract sealed class JCommand {
 	
 	public long address() {
 		if (this.addr == -1L) {
-			throw new AssertionError();
+			Class<?> caller = StackWalker.getInstance(Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+			if (caller != this.getClass() && caller != this.getClass().getSuperclass()) {
+				throw new AssertionError();
+			}
 		}
 		return this.addr;
 	}
@@ -73,12 +77,16 @@ public abstract sealed class JCommand {
 			} else if (!this.componentType.equals(other.componentType)) return false;
 			return true;
 		}
-		
+
 		@Override
 		public String toString() {
 			StringBuilder builder = new StringBuilder();
 			builder.append("NewArray [componentType=");
 			builder.append(this.componentType);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -117,6 +125,10 @@ public abstract sealed class JCommand {
 			StringBuilder builder = new StringBuilder();
 			builder.append(this.getClass().getSimpleName()).append(" [invoke=");
 			builder.append(this.invoke);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -187,6 +199,10 @@ public abstract sealed class JCommand {
 			StringBuilder builder = new StringBuilder();
 			builder.append("InvokeDynamic [invoke=");
 			builder.append(this.invoke);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -229,6 +245,10 @@ public abstract sealed class JCommand {
 			builder.append(this.type);
 			builder.append(", nanValue=");
 			builder.append(this.nanValue);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -271,6 +291,10 @@ public abstract sealed class JCommand {
 			builder.append(this.skip);
 			builder.append(", dupCnt=");
 			builder.append(this.dupCnt);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -315,6 +339,10 @@ public abstract sealed class JCommand {
 			builder.append(this.instance);
 			builder.append(", field=");
 			builder.append(this.field);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -373,6 +401,10 @@ public abstract sealed class JCommand {
 			builder.append(this.localVarIndex);
 			builder.append(", addConst=");
 			builder.append(this.addConst);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -421,6 +453,10 @@ public abstract sealed class JCommand {
 			builder.append(Arrays.toString(this.matches));
 			builder.append(", offsets=");
 			builder.append(Arrays.toString(this.offsets));
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -475,6 +511,10 @@ public abstract sealed class JCommand {
 			builder.append(this.maxValue);
 			builder.append(", offsets=");
 			builder.append(Arrays.toString(this.offsets));
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -517,6 +557,10 @@ public abstract sealed class JCommand {
 			builder.append(this.from);
 			builder.append(", to=");
 			builder.append(this.to);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -561,6 +605,10 @@ public abstract sealed class JCommand {
 			builder.append(this.type);
 			builder.append(", fail=");
 			builder.append(this.fail);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -645,6 +693,10 @@ public abstract sealed class JCommand {
 			builder.append(this.type);
 			builder.append(", index=");
 			builder.append(this.index);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -687,6 +739,10 @@ public abstract sealed class JCommand {
 			builder.append(this.type);
 			builder.append(", index=");
 			builder.append(this.index);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -729,6 +785,10 @@ public abstract sealed class JCommand {
 			builder.append(this.type);
 			builder.append(", op=");
 			builder.append(this.op);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -773,6 +833,10 @@ public abstract sealed class JCommand {
 			builder.append(this.type);
 			builder.append(", dimensions=");
 			builder.append(this.dimensions);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -815,6 +879,10 @@ public abstract sealed class JCommand {
 			builder.append(this.type);
 			builder.append(", value=");
 			builder.append(this.value);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -851,6 +919,10 @@ public abstract sealed class JCommand {
 			StringBuilder builder = new StringBuilder();
 			builder.append("Pop [pops=");
 			builder.append(this.pops);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -889,6 +961,10 @@ public abstract sealed class JCommand {
 			StringBuilder builder = new StringBuilder();
 			builder.append("New [type=");
 			builder.append(this.type);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -925,6 +1001,10 @@ public abstract sealed class JCommand {
 			StringBuilder builder = new StringBuilder();
 			builder.append("Return [type=");
 			builder.append(this.type);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -961,6 +1041,10 @@ public abstract sealed class JCommand {
 			StringBuilder builder = new StringBuilder();
 			builder.append("ArrayLoad [type=");
 			builder.append(this.type);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -997,6 +1081,10 @@ public abstract sealed class JCommand {
 			StringBuilder builder = new StringBuilder();
 			builder.append("ArrayStore [type=");
 			builder.append(this.type);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -1035,6 +1123,10 @@ public abstract sealed class JCommand {
 			StringBuilder builder = new StringBuilder();
 			builder.append("LoadConstPool [entry=");
 			builder.append(this.entry);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -1073,6 +1165,10 @@ public abstract sealed class JCommand {
 			builder.append(this.relativeAdress).append(" : 0x").append(Integer.toHexString(this.relativeAdress));
 			builder.append(", calculatedTarget=");
 			builder.append(this.relativeAdress + super.address()).append(" : 0x").append(Long.toHexString(this.relativeAdress + super.address()));
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -1125,6 +1221,10 @@ public abstract sealed class JCommand {
 			builder.append(super.relativeAdress).append(" : 0x").append(Integer.toHexString(super.relativeAdress));
 			builder.append(", calculatedTarget=");
 			builder.append(super.relativeAdress + super.address()).append(" : 0x").append(Long.toHexString(super.relativeAdress + super.address()));
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append(" : 0x");
+			builder.append(Integer.toHexString((int) this.address()));
 			builder.append("]");
 			return builder.toString();
 		}
@@ -1172,10 +1272,16 @@ public abstract sealed class JCommand {
 			if (this.commandType != other.commandType) return false;
 			return true;
 		}
-		
+
 		@Override
 		public String toString() {
-			return this.commandType.toString();
+			StringBuilder builder = new StringBuilder();
+			builder.append("SimpleCommand [commandType=");
+			builder.append(this.commandType);
+			builder.append(", address()=");
+			builder.append(this.address());
+			builder.append("]");
+			return builder.toString();
 		}
 		
 	}

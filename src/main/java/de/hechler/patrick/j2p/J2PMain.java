@@ -6,7 +6,6 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import de.hechler.patrick.j2p.parse.AlignableDataInput;
 import de.hechler.patrick.j2p.parse.ClassFile;
@@ -48,7 +47,9 @@ public class J2PMain {
 				ClassFile f = reader.read(in);
 				System.out.println(f);
 				for (JMethod m : f.methods()) {
-					System.out.println("understand now: " + f.thisClass() + " # " + m.name + " : " + m.methodType);
+					System.out.println();
+					System.out.println("understand now: " + f.thisClass());
+					System.out.println("       " + m.name + " : " + m.methodType);
 					Map<Integer, AbstractCodeBuilder> map = cu.understand(m);
 					for (AbstractCodeBuilder acb : map.values()) {
 						acb.print(System.out);

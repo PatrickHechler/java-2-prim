@@ -9,21 +9,24 @@ import de.hechler.patrick.j2p.parse.JMethod;
 import de.hechler.patrick.j2p.parse.JSMEVerificationInfo;
 import de.hechler.patrick.j2p.parse.JStackMapEntry;
 import de.hechler.patrick.j2p.parse.JType;
+import de.hechler.patrick.j2p.translate.CodeUnderstander.AgeCmd;
+import de.hechler.patrick.j2p.translate.CodeUnderstander.AgeExp;
 
 @SuppressWarnings("javadoc")
 public class AbstractCodeBuilder {
 	
-	public static final AbstractExpression PARAM_SEPERATOR = new AbstractExpression() {/**/};
+	public static final AgeExp PARAM_SEPERATOR = new AgeExp(new AbstractExpression() {/**/}, -1);
 	
-	public final List<AbstractCommand>    commands = new ArrayList<>();
-	public final List<AbstractExpression> operantStack;
-	public final AbstractExpression[]     localVariables;
+	public final List<AgeCmd>    commands = new ArrayList<>();
+	public final List<AgeExp> operantStack;
+	public final AgeExp[]     localVariables;
 	private boolean                       initilized;
 	private String                        name;
+	public int age;
 	
 	public AbstractCodeBuilder(JMethod method) {
 		this.operantStack   = new ArrayList<>(method.maxStack());
-		this.localVariables = new AbstractExpression[method.maxLocals()];
+		this.localVariables = new AgeExp[method.maxLocals()];
 	}
 	
 	public void setName(String name) {
@@ -40,13 +43,13 @@ public class AbstractCodeBuilder {
 			JSMEVerificationInfo loc  = locs[i];
 			JType                type = typeOfParam(method, loc);
 			if (type == null) continue;
-			this.localVariables[i] = new CodeUnderstander.Parameter(pi++, type);
+			this.localVariables[i] = new AgeExp(new CodeUnderstander.Parameter(pi++, type), 0);
 		}
 		for (int i = 0; i < stack.size(); i++) {
 			JSMEVerificationInfo loc  = stack.get(i);
 			JType                type = typeOfParam(method, loc);
 			if (type == null) continue;
-			this.operantStack.add(new CodeUnderstander.Parameter(pi++, type));
+			this.operantStack.add(new AgeExp(new CodeUnderstander.Parameter(pi++, type), 0));
 		}
 	}
 	
@@ -61,14 +64,14 @@ public class AbstractCodeBuilder {
 			JSMEVerificationInfo loc  = locs[i];
 			JType                type = typeOfParam(method, loc);
 			if (type == null) continue;
-			this.localVariables[i] = new CodeUnderstander.Parameter(pi++, type);
+			this.localVariables[i] = new AgeExp(new CodeUnderstander.Parameter(pi++, type), 0);
 		}
 		JSMEVerificationInfo[] stack = parametrs.stack();
 		for (int i = 0; i < stack.length; i++) {
 			JSMEVerificationInfo loc  = stack[i];
 			JType                type = typeOfParam(method, loc);
 			if (type == null) continue;
-			this.operantStack.add(new CodeUnderstander.Parameter(pi++, type));
+			this.operantStack.add(new AgeExp(new CodeUnderstander.Parameter(pi++, type), 0));
 		}
 	}
 	
@@ -126,7 +129,7 @@ public class AbstractCodeBuilder {
 	
 	public void print(PrintStream out) {
 		out.println("Abstract Code: " + toString());
-		for (AbstractCommand cmd : this.commands) {
+		for (AgeCmd cmd : this.commands) {
 			out.println("  " + cmd);
 		}
 	}
