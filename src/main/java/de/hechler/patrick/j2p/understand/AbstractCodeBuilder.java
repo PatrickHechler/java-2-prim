@@ -1,4 +1,4 @@
-package de.hechler.patrick.j2p.translate;
+package de.hechler.patrick.j2p.understand;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -9,8 +9,8 @@ import de.hechler.patrick.j2p.parse.JMethod;
 import de.hechler.patrick.j2p.parse.JSMEVerificationInfo;
 import de.hechler.patrick.j2p.parse.JStackMapEntry;
 import de.hechler.patrick.j2p.parse.JType;
-import de.hechler.patrick.j2p.translate.CodeUnderstander.AgeCmd;
-import de.hechler.patrick.j2p.translate.CodeUnderstander.AgeExp;
+import de.hechler.patrick.j2p.understand.CodeUnderstander.AgeCmd;
+import de.hechler.patrick.j2p.understand.CodeUnderstander.AgeExp;
 
 @SuppressWarnings("javadoc")
 public class AbstractCodeBuilder {

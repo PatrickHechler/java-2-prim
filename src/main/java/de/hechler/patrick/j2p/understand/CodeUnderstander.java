@@ -1,4 +1,4 @@
-package de.hechler.patrick.j2p.translate;
+package de.hechler.patrick.j2p.understand;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -211,9 +211,8 @@ public class CodeUnderstander {
 		JCommand     cmd            = cmds.get(cmdListIndex);
 		int          birth          = 1;
 		do {
-			JCommand next   = cmds.get(cmdListIndex + 1);
-			AgeCmd   addCmd = understandCommand(method, acbOpStack, acbLocVars, acbLVL, cmd, jumps, cmdsSize - 1 > cmdListIndex ? (int) next.address() : endAddress,
-					birth);
+			JCommand next   = cmdListIndex + 1 < cmdsSize ? cmds.get(cmdListIndex + 1) : null;
+			AgeCmd   addCmd = understandCommand(method, acbOpStack, acbLocVars, acbLVL, cmd, jumps, next != null ? (int) next.address() : endAddress, birth);
 			if (addCmd != null) {
 				acbCmds.add(addCmd);
 				if (addCmd.exp() instanceof AbstractCommand.IfGoto ig) {

@@ -11,8 +11,8 @@ import de.hechler.patrick.j2p.parse.AlignableDataInput;
 import de.hechler.patrick.j2p.parse.ClassFile;
 import de.hechler.patrick.j2p.parse.ClassReader;
 import de.hechler.patrick.j2p.parse.JMethod;
-import de.hechler.patrick.j2p.translate.AbstractCodeBuilder;
-import de.hechler.patrick.j2p.translate.CodeUnderstander;
+import de.hechler.patrick.j2p.understand.AbstractCodeBuilder;
+import de.hechler.patrick.j2p.understand.CodeUnderstander;
 
 @SuppressWarnings("javadoc")
 public class J2PMain {

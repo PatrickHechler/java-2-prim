@@ -1,9 +1,9 @@
-package de.hechler.patrick.j2p.translate;
+package de.hechler.patrick.j2p.understand;
 
 import java.util.List;
 import java.util.Objects;
 
-import de.hechler.patrick.j2p.translate.CodeUnderstander.AgeExp;
+import de.hechler.patrick.j2p.understand.CodeUnderstander.AgeExp;
 
 @SuppressWarnings("javadoc")
 public sealed interface AbstractCommand {
