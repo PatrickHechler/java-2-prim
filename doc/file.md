@@ -1,5 +1,5 @@
 # Java-2-Prim
-the [Constants](#constants) section defines Constants.    
+the [Error Constants](#error-constants) section defines Constants for the `ERRNO` register.    
 the [Method call](#method-call) section describes how natives code has to invoke java code, how native code is invoked by java code and how java code invokes other java methods.    
 the [_JNI-Env_](#_jni-env_) section list all operations of the _JNI-Env_.    
 the [Class Loading](#class-loading) section describes how classes are loaded and found    
@@ -86,6 +86,8 @@ the _JNI-Env_ pointer is usually stored in the `X1F` register (see [Method Call]
 note that no operation allows any of its reference parameters to be invalid or `null` (`-1`) unless otherwise noted.    
 If any reference is invalid (or `null` (`-1`)) the behavior is undefined.    
 a weak references become invalid when the instance which its target becomes garbage collected
+
+note that a returned reference is usually a local-reference (unless otherwise noted)
 
 Operations:
 + `offset=0=HEX-0`   : _throw_
@@ -180,32 +182,34 @@ Operations:
     + `X00` is set to a reference or an already garbage collected reference (but not removed)
     + `X01` is set to a new local reference to the same object instance
     + if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
-    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
     + when the native code returns all its local references will be removed. this includes references which where passed as arguments
 + `offset=144=HEX-90` : _createGlobalReference_
     + `X00` is set to a reference or an already garbage collected reference (but not removed)
     + `X01` is set to a new globl reference to the same object instance
     + if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
-    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
     + global references live until they are explicitly removed
 + `offset=152=HEX-98` : _createWeakReference_
     + `X00` is set to a reference or an already garbage collected reference (but not removed)
     + `X01` is set to a new weak reference to the same object instance
     + if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
-    + when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
-    + weak references do not prevent their target from being garbage collected, but can live until they are removed (either explicitly by using _removeReference_ or implicitly by using a _create*Reference_ operation after the target instance was garbage collected)
+    + weak references live until they are explicitly or implicitly removed
+    + weak references do not prevent their target from being garbage collected
+        + when the target instance is garbage collected, the reference is like the special `null` (`-1`) value
 + `offset=160=HEX-A0` : _removeReference_
     + `X00` is set to a reference or an already garbage collected reference (but not removed)
     + this operation removes the given reference and makes any further use of it invalid
 + `offset=168=HEX-A8` : _ensureFrameSize_
     + `X00` is set to the minimum amount of needed local references
     + native code starts with a frame large enugh to hold 16 local references
+        + after _pvm-java:INIT_ was executed, the initial native frame won't be large enugh to hold any local references
 + `offset=176=HEX-B0` : _growFrame_
     + `X00` is set to the amount of additional needed local references
     + native code starts with a frame large enugh to hold 16 local references
+        + after _pvm-java:INIT_ was executed, the initial native frame won't be large enugh to hold any local references
 + `offset=184=HEX-B8` : _shrinkFrame_
     + `X00` is set to the amount of no longer needed local references
     + native code starts with a frame large enugh to hold 16 local references
+        + after _pvm-java:INIT_ was executed, the initial native frame won't be large enugh to hold any local references
 
 ### java code
 java code can use all _JNI-Env_ operations except of the following
