@@ -20,112 +20,125 @@ JNI_Env_throw_OFF=UHEX-0
 JNI_Env_isThrowing_OFF=UHEX-8
 | sets `X00` to a reference of the class from the exception instance, which is currently being thrown
 | sets `X00` to a `-1` if currently there is no exception instance being thrown
+| modifies `X01` and `X02`
 JNI_Env_getThrowingClass_OFF=UHEX-10
 | sets `X00` to a reference of the exception instance, which is now handled
 | sets `X00` to a `-1` if currently there is no exception instance being thrown
+| modifies `X01` and `X02` if an excception is now handled
 JNI_Env_catch_OFF=UHEX-18
+| `X00` is set to a negative value or zero or an _UTF-8_ `\0` terminated string, which contains the module name
+|   + if `X01` is negative or zero the current module will be used
+|     + if there is no current module (the native code was not called by java code) the behavior is undefined
+| `X00` will be set to a reference of the module
+| if the module could not be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_CLASS`
+JNI_Env_findModule_OFF=UHEX-20
 | `X00` is set to an _UTF-8_ `\0` terminated string, which contains the class binary name
-| `X01` will be set to a reference of the class
+| `X01` is set to a negative value or zero or an _UTF-8_ `\0` terminated string, which contains the module name
+|   + if `X01` is negative or zero the current module will be used
+|     + if there is no current module (the native code was not called by java code) the behavior is undefined
+| `X00` will be set to a reference of the class
 |   + if the class was previusly not loaded, it will be loaded by this operation
 | if the class could not be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_CLASS`
-JNI_Env_findClass_OFF=UHEX-20
+JNI_Env_findClass_OFF=UHEX-28
 | `X00` is a reference to a class object
 | `X01` is set to an _UTF-8_ `\0` terminated string, which contains the method name
 | `X02` is set to an _UTF-8_ `\0` terminated string, which contains the method descriptor
 | `X03` will be set to a _method-reference_
 | if no such method could be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_METHOD`
-JNI_Env_findInstanceMethod_OFF=UHEX-28
+JNI_Env_findInstanceMethod_OFF=UHEX-30
 | `X00` is a reference to a class object
 | `X01` is set to an _UTF-8_ `\0` terminated string, which contains the method name
 | `X02` is set to an _UTF-8_ `\0` terminated string, which contains the method descriptor
 | `X03` will be set to a _method-reference_
 | if no such method could be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_METHOD`
-JNI_Env_findStaticMethod_OFF=UHEX-30
+JNI_Env_findStaticMethod_OFF=UHEX-38
 | `X00` is a reference to a class object
 | `X01` is set to an _UTF-8_ `\0` terminated string, which contains the field name
 | `X02` is set to an _UTF-8_ `\0` terminated string, which contains the field descriptor
 | `X03` will be set to a _field-reference_
 | if no such method could be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_FIELD`
-JNI_Env_findInstanceField_OFF=UHEX-38
+JNI_Env_findInstanceField_OFF=UHEX-40
 | `X00` is a reference to a class object
 | `X01` is set to an _UTF-8_ `\0` terminated string, which contains the field name
 | `X02` is set to an _UTF-8_ `\0` terminated string, which contains the field descriptor
 | `X03` will be set to a _field-reference_
 | if no such method could be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_FIELD`
-JNI_Env_findStaticField_OFF=UHEX-40
+JNI_Env_findStaticField_OFF=UHEX-48
 | `X1E` is a reference to a _method-reference_
 | `X20` is set to a reference of the object instance which should be invoked
 | `X00` will be set to the return value of the method (if any)
 | when the method returns by throwing an exception `ERRNO` will be set to `ERR_JAVA_THROW`
 |   + otherwise it will be set to the previus value of `ERRNO` (the value it had when the method was invoced)
 | when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
-JNI_Env_invokeInstance_OFF=UHEX-48
+JNI_Env_invokeInstance_OFF=UHEX-50
 | `X1E` is a reference to a _method-reference_
 | `X00` will be set to the return value of the method (if any)
 | when the method returns by throwing an exception `ERRNO` will be set to `ERR_JAVA_THROW`
 |   + otherwise it will be set to the previus value of `ERRNO` (the value it had when the method was invoced)
 | when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
-JNI_Env_invokeStatic_OFF=UHEX-50
+JNI_Env_invokeStatic_OFF=UHEX-58
 | `X1E` is a reference to a _method-reference_
 | `X20` is set to a reference of the object instance which should be invoked
 | `X00` will be set to the return value of the method (if any)
 | when the method returns by throwing an exception `ERRNO` will be set to `ERR_JAVA_THROW`
 |   + otherwise it will be set to the previus value of `ERRNO` (the value it had when the method was invoced)
 | when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
-JNI_Env_invokeSuper_OFF=UHEX-58
+JNI_Env_invokeSuper_OFF=UHEX-60
 | `X1E` is a reference to a _method-reference_
 | `X00` will be set to a reference of the newly created instance
 | when the method returns by throwing an exception `ERRNO` will be set to `ERR_JAVA_THROW`
 |   + otherwise it will be set to the previus value of `ERRNO` (the value it had when the method was invoced)
 | when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
-JNI_Env_new_OFF=UHEX-60
+JNI_Env_new_OFF=UHEX-68
 | `X00` is a reference to a _field-reference_
 | `X01` will be set to the value of the field
 | when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
-JNI_Env_getStaticField_OFF=UHEX-68
+JNI_Env_getStaticField_OFF=UHEX-70
 | `X00` is a reference to a _field-reference_
 | `X01` is a reference of the object instance
 | `X02` will be set to the value of the field
 | when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
 | when the field belongs to a class which is no superclass of the object `ERRNO` will be set to `ERR_JAVA_CAST`
-JNI_Env_getInstanceField_OFF=UHEX-70
+JNI_Env_getInstanceField_OFF=UHEX-78
 | `X00` is a reference to a _field-reference_
 | `X01` is set to the new value of the field
 | when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
-JNI_Env_putStaticField_OFF=UHEX-78
+JNI_Env_putStaticField_OFF=UHEX-80
 | `X00` is a reference to a _field-reference_
 | `X01` is a reference of the object instance
 | `X02` is set to the new value of the field
 | when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
 | when the field belongs to a class which is no superclass of the object `ERRNO` will be set to `ERR_JAVA_CAST`
-JNI_Env_putInstanceField_OFF=UHEX-80
+JNI_Env_putInstanceField_OFF=UHEX-88
 | `X00` is set to a reference or an already garbage collected reference (but not removed)
 | `X01` is set to a new local reference to the same object instance
 | if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
-| when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
 | when the native code returns all its local references will be removed. this includes references which where passed as arguments
-JNI_Env_createLocalReference_OFF=UHEX-88
+JNI_Env_createLocalReference_OFF=UHEX-90
 | `X00` is set to a reference or an already garbage collected reference (but not removed)
 | `X01` is set to a new globl reference to the same object instance
 | if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
-| when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
 | global references live until they are explicitly removed
-JNI_Env_createGlobalReference_OFF=UHEX-90
+JNI_Env_createGlobalReference_OFF=UHEX-98
 | `X00` is set to a reference or an already garbage collected reference (but not removed)
 | `X01` is set to a new weak reference to the same object instance
 | if the given reference references an already garbage collected reference, it will be removed automatically and `X01` will be set to `-1`
-| when the permission is denied `ERRNO` will be set to `ERR_JAVA_PERM`
-| weak references do not prevent their target from being garbage collected, but can live until they are removed (either explicitly by using _removeReference_ or implicitly by using a _create*Reference_ operation after the target instance was garbage collected)
-JNI_Env_createWeakReference_OFF=UHEX-98
+| weak references live until they are explicitly or implicitly removed
+| weak references do not prevent their target from being garbage collected
+|   + when the target instance is garbage collected, the reference is like the special `null` (`-1`) value
+JNI_Env_createWeakReference_OFF=UHEX-A0
 | `X00` is set to a reference or an already garbage collected reference (but not removed)
 | this operation removes the given reference and makes any further use of it invalid
-JNI_Env_removeReference_OFF=UHEX-A0
+JNI_Env_removeReference_OFF=UHEX-A8
 | `X00` is set to the minimum amount of needed local references
 | native code starts with a frame large enugh to hold 16 local references
-JNI_Env_ensureFrameSize_OFF=UHEX-A8
+|   + after _pvm-java:INIT_ was executed, the initial native frame won't be large enugh to hold any local references
+JNI_Env_ensureFrameSize_OFF=UHEX-B0
 | `X00` is set to the amount of additional needed local references
 | native code starts with a frame large enugh to hold 16 local references
-JNI_Env_growFrame_OFF=UHEX-B0
+|   + after _pvm-java:INIT_ was executed, the initial native frame won't be large enugh to hold any local references
+JNI_Env_growFrame_OFF=UHEX-B8
 | `X00` is set to the amount of no longer needed local references
 | native code starts with a frame large enugh to hold 16 local references
-JNI_Env_shrinkFrame_OFF=UHEX-B8
+|   + after _pvm-java:INIT_ was executed, the initial native frame won't be large enugh to hold any local references
+JNI_Env_shrinkFrame_OFF=UHEX-C0

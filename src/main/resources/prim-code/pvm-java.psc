@@ -5,6 +5,7 @@
 	#JNI_Env_ADD_POS 0
 ~ELSE
 	~READ_SYM "constants.psf" >
+	~READ_SYM "internal-structures.psf" >
 	~READ_SYM "[THIS]" --MY_CONSTS-- #ADD~ME 1 >
 ~ENDIF
 :
@@ -12,70 +13,30 @@
 	pvm_java_MAIN
 >
 
-|:	internal structures:
-|	struct native_object_reference {
-|		struct object_instance# object_address; // negative if weak-reference and already gc
-|	}
-|	// note that all object_instance values are saved with an offset less than zero (normally -8, but for arrays -16)
-|	// all object instances are 8-bytes aligned
-|	struct object_instance {
-|		struct object_instance# class; // off = NHEX-8
-|		union field[] fields;          // off =  HEX-0
-|	}
-|	struct string_instance {
-|		struct object_instance# class; // off = NHEX-8
-|		struct array_instance# value;  // off =  HEX-0
-|		dword hash;                    // off =  HEX-10
-|		byte coder;                    // off =  HEX-14
-|		ubyte hash_is_zero;            // off =  HEX-15
-|	}
-|	struct class_instance {
-|		struct object_instance# class;       // off = NHEX-8
-|		ubyte type;                          // off =  HEX-0
-|		// object_class_instance:    UHEX-0
-|		// array_class_instance:     UHEX-1
-|		// primitive_class_instance: UHEX-3
-|		// note that the other bits can have any value
-|	}
-|	struct object_class_instance {
-|		struct object_instance# class;       // off = NHEX-8
-|		struct hash_set# instance_fields_p;  // off =  HEX-0
-|		// all instances are aligned, so this is ok
-|		struct hash_set# instance_methods_p; // off =  HEX-8
-|		struct hash_set# static_fields_p;    // off =  HEX-10
-|		struct hash_set static_methods;      // off =  HEX-18
-|		struct hash_set instance_fields;
-|		struct hash_set instance_methods;
-|		struct hash_set static_fields;
-|	}
-|	struct array_class_instance {
-|		struct object_instance# class; // off = NHEX-8
-|		num component_type_p1;         // off =  HEX-0
-|		// all instances are aligned, so this is ok
-|		// the value struct object_instance# component_type is calculated by subtracting 1 from component_type_p1
-|	}
-|	struct array_instance {
-|		num length;                    // off = NHEX-10
-|		struct object_instance# class; // off = NHEX-8
-|		T[] value;                     // off =  HEX-0
-|	}
-|	struct primitive_class_instance {
-|		struct object_instance# class;       // off = NHEX-8
-|		num type;                            // off =  HEX-0
-|		// see the constants defined below
+|:	hash set
+|	struct hash_set {
+|		num# entries;
+|		unum maxi; // if set to zero the set size is zero
+|		unum entry_count;
+|		func (num a, num b) --> <num equal> equalizer;
+|		func (num val) --> <unum hash> equalizer;
 |	}
 |:>
-#prim_class_byte    UHEX-0000000000000103
-#prim_class_short   UHEX-0000000000000203
-#prim_class_int     UHEX-0000000000000403
-#prim_class_long    UHEX-0000000000000803
-#prim_class_float   UHEX-0000000000001003
-#prim_class_double  UHEX-0000000000002003
-#prim_class_char    UHEX-0000000000004003
-#prim_class_boolean UHEX-0000000000008003
-#prim_class_void    UHEX-0000000000000003
+|:	func hashset_get(struct hash_set# set, unum hash, num val) --> <struct hash_set# set_, num result>
+|	X00: set/set_
+|	X01: hash/result
+|	X02: val
+|:>
+#EXP~hashset_get_POS --POS--
+	|> TODO implement
+|> TODO define/implement other hash_set functions
+
+
+
 
 #native_throw_POS --POS--
+: -1 >
+#native_exec_class_POS --POS--
 : -1 >
 #local_reference_size_POS --POS--
 : 0 >
@@ -86,7 +47,7 @@
 |	if needed the current frame will grow
 |	parameter: X00: points to the instance
 |	results: X00: the local-reference, ERRNO: zero on success otherwise non-zero
-|	modifies: X01, X02, X03
+|	modifies: X01, X02
 |:>
 @add_local_reference
 	#REL_POS ( local_reference_size_POS - --POS-- )
@@ -102,12 +63,16 @@
 		SGN X01
 		JMPGT add_local_reference_loop
 	|> no unused ref found, grow by 4 references
-	MOV X03, X01
 	ADD X01, 32
 	SWAP X00, X02
 	INT INT_MEMORY_REALLOC
 	JMPERR return
-	ADD X00, X03
+	#REL_POS ( local_references_adr_POS - --POS-- )
+	MOV [IP + REL_POS], X00
+	#REL_POS ( local_reference_size_POS - --POS-- )
+	MOV [IP + REL_POS], X01
+	ADD X00, X01
+	SUB X00, 32
 	MOV [X00], X02
 	RET
 	@found_free_reference
@@ -134,7 +99,7 @@
 #JNI_Env_throw ( --POS-- - JNI_Env_ADD_POS )
 	MOV ERRNO, ERR_JAVA_THROW
 	#REL_POS ( native_throw_POS - --POS-- )
-	MOV [IP + REL_POS], X00
+	MOV [IP + REL_POS], [X00]
 	@return
 	RET
 #JNI_Env_isThrowing ( --POS-- - JNI_Env_ADD_POS )
@@ -144,17 +109,37 @@
 	MOV X00, 1
 	RET
 	@returnX00_0
-	XOR X00, X00
-	RET
+		XOR X00, X00
+		RET
 #JNI_Env_getThrowingClass ( --POS-- - JNI_Env_ADD_POS )
-	|> TODO implement
-	RET
+	#REL_POS ( native_throw_POS - --POS-- )
+	MOV X00, [IP + REL_POS]
+	SGN X00
+	JMPLT returnX00_m1
+	MOV X00, [X00]
+	JMP add_local_reference
+	@returnX00_m1
+		MOV X00, -1
+		RET
 #JNI_Env_catch ( --POS-- - JNI_Env_ADD_POS )
+	MOV X00, -1
+	#REL_POS ( native_throw_POS - --POS-- )
+	SWAP X00, [IP + REL_POS]
+	SGN X00
+	JMPLT return
+	JMP add_local_reference
+#JNI_Env_findModule ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
 #JNI_Env_findClass ( --POS-- - JNI_Env_ADD_POS )
-	|> TODO implement
-	RET
+	SGN X01
+	JMPGT JNI_Env_findClass_module_found
+	#REL_POS ( native_exec_class_POS - --POS-- )
+	MOV X01, [IP + REL_POS]
+	MOV X01, [X01 + object_class_instance_module_OFF]
+	@JNI_Env_findClass_module_found
+		
+		RET
 #JNI_Env_findInstanceMethod ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
@@ -221,6 +206,7 @@
 	JNI_Env_isThrowing
 	JNI_Env_getThrowingClass
 	JNI_Env_catch
+	JNI_Env_findModule
 	JNI_Env_findClass
 	JNI_Env_findInstanceMethod
 	JNI_Env_findStaticMethod
