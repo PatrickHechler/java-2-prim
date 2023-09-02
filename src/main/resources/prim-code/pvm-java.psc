@@ -13,23 +13,89 @@
 	pvm_java_MAIN
 >
 
-|:	hash set
-|	struct hash_set {
-|		num# entries;
-|		unum maxi; // if set to zero the set size is zero
-|		unum entry_count;
-|		func (num a, num b) --> <num equal> equalizer;
-|		func (num val) --> <unum hash> equalizer;
+|>	hash set
+|:	struct hs_list {
+|		unum size; // note that size contains the size of the structure
+|		num[] entries;
 |	}
 |:>
-|:	func hashset_get(struct hash_set# set, unum hash, num val) --> <struct hash_set# set_, num result>
-|	X00: set/set_
-|	X01: hash/result
+|:	struct hashset {
+|		num# entries;                                     // off = HEX-0
+|		unum maxi; // if set to zero the set size is zero // off = HEX-8
+|		unum entry_count;                                 // off = HEX-10
+|		func (num a, num b) --> <num equal> equalizer;    // off = HEX-18
+|			X00: c --> c
+|			X01: a --> equal (0 = not-equal)
+|			X02: b --> b
+|		func (num val) --> <unum hash> hashmaker;         // off = HEX-20
+|			X00: c --> c
+|			X01: val --> hash
+|	}
+|:>
+#EXP~hashset_SIZE HEX-28
+#EXP~hashset_hashmaker_OFF HEX-20
+#EXP~hashset_equalizer_OFF HEX-18
+#EXP~hashset_entry_count_OFF HEX-10
+#EXP~hashset_maxi_OFF HEX-8
+|:	func hashset_get(struct hashset# set, unum hash, num val) --> <struct hashset# set_, num result>
+|	X00: set --> set
+|	X01: hash --> result (negative: not found; other: value)
 |	X02: val
+|	X03, X04: --> ?
 |:>
 #EXP~hashset_get_POS --POS--
+	AND X01, [X00, hashset_maxi_OFF]
+	LSH X01, 3
+	MOV X01, [X00 + X01]
+	CMP X01, -1
+	JMPGT hs_get_check_result
+	JMPEQ return
+	NOT X01
+	MOV X03, X01
+	MVAD X04, [X03], -8
+	@hs_get_list_loop
+		MOV X01, [X03 + X04]
+		CALNO [X00 + hashset_equalizer_OFF]
+		SGN X01
+		JMPNE hs_get_list_loop_found
+		SUB X04, 8
+		JMPZC hs_get_list_loop
+	MOV X01, -1
+	RET
+		@hs_get_list_loop_found
+			MOV X01, [X03 + X04]
+			RET
+	@hs_get_check_result
+		MOV X03, X01
+		CALNO [X00 + hashset_equalizer_OFF]
+		SGN X01
+		JMPEQ returnX01_m1
+		MOV X01, X03
+		RET
+	@returnX01_m1
+		MOV X01, -1
+		RET
+|:	func hashset_put(struct hashset# set, unum hash, num newval) --> <struct hashset# set_, num oldval>
+|	X00: set --> set_
+|	X01: hash --> oldval
+|	X02: newval
+|:>
+#EXP~hashset_put_POS --POS--
 	|> TODO implement
-|> TODO define/implement other hash_set functions
+|:	func hashset_add(struct hashset# set, unum hash, num newval) --> <struct hashset# set_, num value>
+|	X00: set --> set_
+|	X01: hash --> value
+|	X02: newval
+|:>
+#EXP~hashset_add_POS --POS--
+	|> TODO implement
+|:	func hashset_remove(struct hashset# set, unum hash, num oldval) --> <struct hashset# set_, num oldval>
+|	X00: set --> set_
+|	X01: hash --> oldval
+|	X02: newval
+|:>
+#EXP~hashset_remove_POS --POS--
+	|> TODO implement
 
 
 
