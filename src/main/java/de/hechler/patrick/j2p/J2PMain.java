@@ -39,8 +39,8 @@ public class J2PMain {
 				files.add(a);
 			}
 		}
-		ClassReader reader = new ClassReader();
-		CodeUnderstander cu = new CodeUnderstander();
+		ClassReader      reader = new ClassReader();
+		CodeUnderstander cu     = new CodeUnderstander();
 		for (String file : files) {
 			try (AlignableDataInput in = new AlignableDataInput(new FileInputStream(file))) {
 				System.out.println("parse now: " + file);
