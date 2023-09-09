@@ -43,8 +43,7 @@
 |	X03: set --> set
 |	X04: hash --> result (negative: not found; other: value)
 |	X05: val --> ?
-|	X06: --> ?
-|	X07: --> ?
+|	X06, X07: --> ?
 |	other registers may also be modified if set#.equalizer modifies them
 |:>
 #EXP~hashset_get_POS --POS--
@@ -89,7 +88,7 @@
 |	X03: set --> set_
 |	X04: hash --> oldval
 |	X05: newval --> ?
-|	X06 .. X --> ?
+|	X06 .. X0F --> ?
 |	other registers may also be modified if set#.equalizer or set#.hashmaker modifies them
 |:>
 #EXP~hashset_add_POS --POS--
@@ -100,7 +99,7 @@
 |	X03: set --> set_
 |	X04: hash --> oldval
 |	X05: putval --> ?
-|	X06 .. X --> ?
+|	X06 .. X0F --> ?
 |	other registers may also be modified if set#.equalizer or set#.hashmaker modifies them
 |:>
 #EXP~hashset_put_POS --POS--
@@ -561,7 +560,7 @@
 					ADD X01, X08
 					MVAD X00, X07, 8
 					ADD X00, X08
-					INT INT_MEM_MOVE
+					INT INT_MEM_MOV
 				@hs_rem__check_list__loop__found__shrink_list__no_mem_move
 				SUB [X07], 8
 				MOV X01, [X07]
