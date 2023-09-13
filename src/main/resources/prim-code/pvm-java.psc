@@ -1,8 +1,27 @@
+|:This file is part of the java-2-prim Project
+| DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+| Copyright (C) 2023 Patrick Hechler
+|
+| This program is free software: you can redistribute it and/or modify
+| it under the terms of the GNU General Public License as published by
+| the Free Software Foundation, either version 3 of the License, or
+| (at your option) any later version.
+|
+| This program is distributed in the hope that it will be useful,
+| but WITHOUT ANY WARRANTY; without even the implied warranty of
+| MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+| GNU General Public License for more details.
+|
+| You should have received a copy of the GNU General Public License
+| along with this program. If not, see <https://www.gnu.org/licenses/>.
+|:>
+
 ~IF #~ME
 	#pvm_java_INIT 0
 	#pvm_java_MAIN 0
 	#pvm_java_INIT_ADD_POS 0
-	#JNI_Env_ADD_POS 0
+	
+#JNI_Env_ADD_POS 0
 ~ELSE
 	~READ_SYM "constants.psf" >
 	~READ_SYM "internal-structures.psf" >
@@ -32,6 +51,7 @@
 |			X03: c --> c
 |			X04: val --> hash
 |			X05..X0F: n --> n // both inclusive
+|		// TODO check if X00..X02 are modifiable for equalizer/hashmaker
 |	}
 |:>
 #EXP~hashset_SIZE HEX-28
@@ -157,7 +177,7 @@
 		JMPLT hs_add_put__grow_loop__list
 		MOV X04, X0C
 		CALNO [X03 + hashset_hashmaker_OFF]
-		JMPERR return
+		JMPERR hs_resize__free_not_new
 		AND X04, X08
 		LSH X04, 3
 		MOV X0D, [X0A + X04]
@@ -178,21 +198,24 @@
 		|:>
 		MOV [X0A + X04], X0C
 		JMP hs_add_put__grow_loop__fin_iter
-		|:	X08: (not) new set#.maxi ((set#.maxi << 1) | 1)
-		|	X0A: (not) new set#.entries
-		|	frees all lists in the not new set#.entries and the not new set#.entries. then returns to caller
+		|:	X08: (not new) set#.maxi
+		|	X0A: (not new) set#.entries
+		|	frees all lists in the not new set#.entries and the not new set#.entries; then returns to caller
+		|	modifies:
+		|		X00, X08
+		|		(does not modify the set)
 		|:>
-		@hs_add_put__grow_loop__ERROR
+		@hs_resize__free_not_new |> note that this function is also used by hs_rem_shrink
 			LSH X08, 3
-			@hs_add_put__grow_loop__ERROR_loop
+			@hs_resize__free_not_new_loop
 				MOV X00, [X0A + X08]
 				CMP X00, -1
-				JMPGE hs_add_put__grow_loop__ERROR_loop__iter_end
+				JMPGE hs_resize__free_not_new_loop__iter_end
 				NOT X00
 				INT INT_MEMORY_FREE
-				@hs_add_put__grow_loop__ERROR_loop__iter_end
+				@hs_resize__free_not_new_loop__iter_end
 					USUB X08, 8
-					JMPCC hs_add_put__grow_loop__ERROR_loop
+					JMPCC hs_resize__free_not_new_loop
 			MOV X00, X0A
 			INT INT_MEMORY_FREE
 			RET
@@ -211,8 +234,8 @@
 		@hs_add_put__grow_loop__entry__create_list
 			MOV X00, 32
 			INT INT_MEMORY_ALLOC
-			JMPERR return
-			MOV [X00], 8
+			JMPERR hs_resize__free_not_new
+			MOV [X00], 16
 			MOV [X00 + 8], X0D
 			MOV [X00 + 16], X0C
 			NOT X00
@@ -234,20 +257,20 @@
 			NOT X0D
 			ADD [X0D], 8
 			MOV X0E, [X0D]
-			MVAD X03, X0E, -1
-			BCP X0D, X03
+			MVAD X00, X0E, -1
+			BCP X0E, X00
 			JMPSB hs_add_put__grow_loop__entry__add_list__no_list_grow
-			MOV X00, X0D
-			MOV X01, X0E
-			LSH X01, 1
-			INT INT_MEMORY_REALLOC |> on error undo the decrease list size
-			JMPERR hs_add_put__grow_loop__ERROR
-			MOV X0D, X00
-			NOT X00
-			MOV [X0A + X04], X00
+				MOV X00, X0D
+				MOV X01, X0E
+				LSH X01, 1
+				INT INT_MEMORY_REALLOC |> on error undo the increase list size is not needed, the list is freed
+				JMPERR hs_resize__free_not_new
+				MOV X0D, X00
+				NOT X00
+				MOV [X0A + X04], X00
 			@hs_add_put__grow_loop__entry__add_list__no_list_grow
-				MOV [X0D + X0E], X0C
-				JMP hs_add_put__grow_loop__fin_iter
+			MOV [X0D + X0E], X0C
+			JMP hs_add_put__grow_loop__fin_iter
 		|:	X03: set
 		|	X04: -
 		|	X05: newval
@@ -278,7 +301,7 @@
 				MOV X0E, [X0C + X0D]
 				MOV X04, X0E
 				CALNO [X03 + hashset_hashmaker_OFF]
-				JMPERR return
+				JMPERR hs_resize__free_not_new
 				AND X04, X08
 				LSH X04, 3
 				MOV X0F, [X0A + X04]
@@ -308,22 +331,22 @@
 					MVAD X02, X03, -1
 					BCP X03, X02
 					JMPSB hs_add_put__grow_loop__list__loop__add_list__no_grow
-					MOV X01, X03
-					LSH X01, 1
-					MOV X00, X0F
-					INT INT_MEMORY_REALLOC
-					JMPERR hs_add_put__grow_loop__ERROR
-					MOV X0F, X00
-					NOT X00
-					MOV [X0A + X04], X00
+						MOV X01, X03
+						LSH X01, 1
+						MOV X00, X0F
+						INT INT_MEMORY_REALLOC
+						JMPERR hs_resize__free_not_new |> no need to shrink list, it is freed the same way
+						MOV X0F, X00
+						NOT X00
+						MOV [X0A + X04], X00
 					@hs_add_put__grow_loop__list__loop__add_list__no_grow
-						MOV [X0F + X03], X0E
-						JMP hs_add_put__grow_loop__list__loop__iter_end
+					MOV [X0F + X03], X0E
+					JMP hs_add_put__grow_loop__list__loop__iter_end
 				@hs_add_put__grow_loop__list__loop__create_list
 					MOV X00, 32
 					INT INT_MEMORY_ALLOC
-					JMPERR return
-					MOV [X00], 8
+					JMPERR hs_resize__free_not_new
+					MOV [X00], 16
 					MOV [X00 + 8], X0F
 					MOV [X00 + 16], X0E
 					NOT X00
@@ -406,6 +429,8 @@
 			MOV [X00], 8
 			MOV [X00 + 8], X0A
 			MOV [X00 + 16], X05
+			NOT X00
+			MOV [X06 + X04], X00
 			INC [X03 + hashset_entry_count_OFF]
 			MOV X04, -1
 			RET
@@ -499,9 +524,11 @@
 			RET
 
 |:	func hashset_remove(struct hashset# set, unum hash, num oldval) --> <struct hashset# set_, num oldval>
+|	X00 .. X02 : --> ?
 |	X03: set --> set_
 |	X04: hash --> oldval
 |	X05: remval --> ?
+|	X06 .. X09 : --> ?
 |:>
 #EXP~hashset_remove_POS --POS--
 	|:	X03: set
@@ -609,9 +636,173 @@
 	|	X04: oldvalue
 	|	X05: -
 	|	X06: set#.entries
+	|	returns to caller, after possibly shriking the set
 	|:>
 	@hs_rem_shrink
 		DEC [X03 + hashset_entry_count_OFF]
+		MOV X05, [X03 + hashset_entry_count_OFF]
+		MOV X07, [X03 + hashset_maxi_OFF]
+		RLSH X07, 2
+		CMP X07, X05
+		JMPLT return
+		SGN X05
+		JMPEQ hs_rem_shrink__free_all
+		MOV X08, [X03 + hashset_maxi_OFF]
+		RLSH X08, 1
+		MOV X00, X08
+		LSH X00, 3
+		MOV X01, HEX-FF
+		MOV X02, X00
+		INT INT_MEMORY_ALLOC
+		JMPERR return
+		INT INT_MEM_BSET
+		MOV X0A, X00
+		|:	X03: set
+		|	X04: oldvalue
+		|	X05: set#.entry_count
+		|	X06: set#.entries
+		|	X07: set#.maxi >>> 2
+		|	X08: new set#.maxi
+		|	X09: -
+		|	X0A: new set#.entries
+		|:>
+		LSH X07, 5
+		OR X07, BIN-10000 |> X07 <-- ( X07 | BIN-11000 ) - 8 // ( set#.maxi << 3 ) - 8
+		MOV X0B, X04
+		|:	X03: set
+		|	X04: -
+		|	X05: set#.entry_count
+		|	X06: set#.entries
+		|	X07: loop/set#.entries offset (start: (set#.maxi << 3) - 8)
+		|	X08: new set#.maxi
+		|	X09: -
+		|	X0A: new set#.entries
+		|	X0B: oldvalue
+		|:>
+		@hs_rem_shrink__loop
+			MOV X09, [X06 + X07]
+			CMP X09, -1
+			JMPEQ hs_rem_shrink__loop_iter_end
+			JMPLT hs_rem_shrink__loop__list
+				MOV X04, X09
+				CALNO [X03 + hashset_hashmaker_OFF]
+				JMPERR hs_resize__free_not_new
+				AND X04, X0A
+				LSH X04, 3
+				MOV X0C, [X0A + X04]
+				CMP X0C, -1
+				JMPLT hs_rem_shrink__loop__value__to_list
+				JMPGT hs_rem_shrink__loop__value__to_value
+				MOV [X0A + X04], X04
+			@hs_rem_shrink__loop_iter_end
+				USUB X07, 9
+				JMPCC hs_rem_shrink__loop
+		SWAP [X03], X0A
+		SWAP [X03 + hashset_maxi_OFF], X08
+		JMP hs_resize__free_not_new |> well, it frees the old
+				@hs_rem_shrink__loop__value__to_value
+					MOV X00, 32
+					INT INT_MEMORY_ALLOC
+					JMPERR hs_resize__free_not_new
+					MOV [X00], 16
+					MOV [X00 + 8], X0C
+					MOV [X00 + 16], X09
+					NOT X00
+					MOV [X0A + X04], X00
+					JMP hs_rem_shrink__loop_iter_end
+				@hs_rem_shrink__loop__value__to_list
+					NOT X0C
+					ADD [X0C], 8
+					MOV X01, [X0C]
+					MVAD X00, X01, -1
+					BCP X01, X00
+					JMPSB hs_rem_shrink__loop__value__to_list__no_list_grow
+						MOV X00, X0C
+						LSH X01, 1
+						INT INT_MEMORY_REALLOC |> on error undo the decrease list size is not needed
+						JMPERR hs_resize__free_not_new
+						MOV X0C, X00
+						NOT X00
+						MOV [X0A + X04], X00
+						MOV X01, [X0C]
+					@hs_rem_shrink__loop__value__to_list__no_list_grow
+					MOV [X0C + X01], X09
+					JMP hs_rem_shrink__loop_iter_end
+			|:	X03: set
+			|	X04: -
+			|	X05: set#.entry_count
+			|	X06: set#.entries
+			|	X07: loop/set#.entries offset (start: (set#.maxi << 3) - 8)
+			|	X08: new set#.maxi
+			|	X09: current entry (a list) to be added to new set#.entries (X0A)
+			|	X0A: new set#.entries
+			|	X0B: oldvalue
+			|:>
+			@hs_rem_shrink__loop__list
+				NOT X09
+				MOV X0C, [X09]
+				@hs_rem_shrink__loop__list__loop
+					MOV X0D, [X09 + X0D]
+					MOV X04, X0D
+					CALNO [X03 + hashset_hashmaker_OFF]
+					AND X04, X08
+					LSH X04, 3
+					MOV X0E, [X0A + X04]
+					CMP X0E, -1
+					JMPEQ hs_rem_shrink__loop__list__loop__to_empty
+					JMPLT hs_rem_shrink__loop__list__loop__to_list
+						MOV X00, 32
+						INT INT_MEMORY_ALLOC
+						JMPERR hs_resize__free_not_new
+						MOV [X00], 16
+						MOV [X00 + 8], X0E
+						MOV [X00 + 16], X0D
+						NOT X00
+						MOV [X0A + X04], X00
+						JMP hs_rem_shrink__loop__list__loop_iter_end
+					|:	X03: set
+					|	X04: offset in new set#.entries (X0A) of X0D/X0E
+					|	X05: set#.entry_count
+					|	X06: set#.entries
+					|	X07: loop/set#.entries offset (start: (set#.maxi << 3) - 8)
+					|	X08: new set#.maxi
+					|	X09: current entry (a list) to be added to new set#.entries (X0A)
+					|	X0A: new set#.entries
+					|	X0B: oldvalue
+					|	X0C: offset in the list
+					|	X0D: current list entry to be added to new set#.entries (X0A)
+					|	X0E: value in new set#.entries (X0A) at the place where X0C should be inserted
+					|:>
+					@hs_rem_shrink__loop__list__loop__to_list
+						NOT X0E
+						ADD [X0E], 8
+						MOV X01, [X0E]
+						MVAD X00, X01, -1
+						BCP X01, X00
+						JMPSB hs_rem_shrink__loop__list__loop__to_list__no_list_grow
+							MOV X00, X0E
+							LSH X01, 1
+							INT INT_MEMORY_REALLOC |> on error undo the decrease list size is not needed
+							JMPERR hs_resize__free_not_new
+							MOV X0E, X00
+							NOT X00
+							MOV [X0A + X04], X00
+							MOV X01, [X0E]
+						@hs_rem_shrink__loop__list__loop__to_list__no_list_grow
+						MOV [X0E + X01], X0D
+						JMP hs_rem_shrink__loop__list__loop_iter_end
+					@hs_rem_shrink__loop__list__loop__to_empty
+						MOV [X0A + X04], X0D
+					@hs_rem_shrink__loop__list__loop_iter_end
+						SUB X0C, 8
+						JMPZC hs_rem_shrink__loop__list__loop
+				JMP hs_rem_shrink__loop__list__loop_iter_end
+		@hs_rem_shrink__free_all
+			MOV X00, X06
+			INT INT_MEMORY_FREE
+			MOV [X03], -1
+			MOV [X03 + hashset_maxi_OFF], 0
+			RET
 
 
 #native_throw_POS --POS--
@@ -672,6 +863,7 @@
 		MOV [X00], X01
 		RET
 
+
 |:	X00 stores a reference to the exception instance which should been thrown
 |	ERRNO will be set to ERR_JAVA_THROW
 |	if there is already an exception instance which is being 
@@ -682,6 +874,7 @@
 	MOV [IP + REL_POS], [X00]
 	@return
 	RET
+
 #JNI_Env_isThrowing ( --POS-- - JNI_Env_ADD_POS )
 	#REL_POS ( native_throw_POS - --POS-- )
 	SGN [IP + REL_POS]
@@ -691,6 +884,7 @@
 	@returnX00_0
 		XOR X00, X00
 		RET
+
 #JNI_Env_getThrowingClass ( --POS-- - JNI_Env_ADD_POS )
 	#REL_POS ( native_throw_POS - --POS-- )
 	MOV X00, [IP + REL_POS]
@@ -701,6 +895,7 @@
 	@returnX00_m1
 		MOV X00, -1
 		RET
+
 #JNI_Env_catch ( --POS-- - JNI_Env_ADD_POS )
 	MOV X00, -1
 	#REL_POS ( native_throw_POS - --POS-- )
@@ -708,9 +903,11 @@
 	SGN X00
 	JMPLT return
 	JMP add_local_reference
+
 #JNI_Env_findModule ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_findClass ( --POS-- - JNI_Env_ADD_POS )
 	SGN X01
 	JMPGT JNI_Env_findClass_module_found
@@ -720,68 +917,88 @@
 	@JNI_Env_findClass_module_found
 		
 		RET
+
 #JNI_Env_findInstanceMethod ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_findStaticMethod ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_findInstanceField ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_findStaticField ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_invokeInstance ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_invokeStatic ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_invokeSuper ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_new ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_getStaticField ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_getInstanceField ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_putStaticField ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_putInstanceField ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_createLocalReference ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_createGlobalReference ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_createWeakReference ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_removeReference ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_ensureFrameSize ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_growFrame ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
+
 #JNI_Env_shrinkFrame ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
 	RET
 
+
 #JNI_Env_POS --POS--
 :
-|> GENERATED-CODE-START
-|> this code-block is automatic generated, do not modify
+	|> GENERATED-CODE-START
+	|> this code-block is automatic generated, do not modify
 	JNI_Env_throw
 	JNI_Env_isThrowing
 	JNI_Env_getThrowingClass
@@ -807,10 +1024,11 @@
 	JNI_Env_ensureFrameSize
 	JNI_Env_growFrame
 	JNI_Env_shrinkFrame
-
-|> here is the end of the automatic generated code-block
-|> GENERATED-CODE-END
+	
+	|> here is the end of the automatic generated code-block
+	|> GENERATED-CODE-END
 >
+
 #JNI_Env_LEN ( --POS-- - JNI_Env_POS )
 
 #EXP~pvm_java_INIT --POS--
