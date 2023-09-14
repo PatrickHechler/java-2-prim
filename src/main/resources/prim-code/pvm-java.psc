@@ -54,11 +54,11 @@
 |		// TODO check if X00..X02 are modifiable for equalizer/hashmaker
 |	}
 |:>
-#EXP~hashset_SIZE HEX-28
 #EXP~hashset_maxi_OFF HEX-8
 #EXP~hashset_entry_count_OFF HEX-10
 #EXP~hashset_equalizer_OFF HEX-18
 #EXP~hashset_hashmaker_OFF HEX-20
+#EXP~hashset_SIZE HEX-28
 |:	func hashset_get(struct hashset# set, unum hash, num val) --> <struct hashset# set_, num result>
 |	X03: set --> set
 |	X04: hash --> result (negative: not found; other: value)
@@ -860,10 +860,38 @@
 #local_references_adr_POS --POS--
 : -1 >
 
+#modules_set_POS --POS--
+:
+	-1 |> entries
+	0  |> maxi
+	0  |> entry_count
+	0  |> equalizer
+	0  |> hashmaker
+>
+
+|:		func (num a, num b) --> <num equal> equalizer;    // off = HEX-18
+|			X03: c --> c
+|			X04: a --> equal (0 = not-equal)
+|			X05: b --> b
+|			X06..X0F: n --> n // both inclusive
+|:>
+#modules_set_equal_POS --POS--
+	|> TODO implement
+
+|:		func (num val) --> <unum hash> hashmaker;         // off = HEX-20
+|			X03: c --> c
+|			X04: val --> hash
+|			X05..X0F: n --> n // both inclusive
+|:>
+#modules_set_hash_POS --POS--
+	|> TODO implement
+
 |:	creates a new local reference and let it refer to the X00 value
 |	if needed the current frame will grow
 |	parameter: X00: points to the instance
-|	results: X00: the local-reference, ERRNO: zero on success otherwise non-zero
+|	results:
+|		X00: the local-reference on success otherwise set to -1
+|		ERRNO: unmodified on success otherwise set to a non-zero value
 |	modifies: X01, X02
 |:>
 @add_local_reference
@@ -883,7 +911,8 @@
 	ADD X01, 32
 	SWAP X00, X02
 	INT INT_MEMORY_REALLOC
-	JMPERR return
+	SGN X00 |> do not use JMPERR, since ERRNO is allowed to be set to a non-zero value when this function is called
+	JMPLE returnX00_m1
 	#REL_POS ( local_references_adr_POS - --POS-- )
 	MOV [IP + REL_POS], X00
 	#REL_POS ( local_reference_size_POS - --POS-- )
@@ -901,7 +930,8 @@
 		MOV X01, X00
 		MOV X00, 128
 		INT INT_MEMORY_ALLOC
-		JMPERR return
+		SGN X00
+		JMPLE returnX00_m1
 		#REL_POS ( local_references_adr_POS - --POS-- )
 		MOV [IP + REL_POS], X00
 		#REL_POS ( local_reference_size_POS - --POS-- )
@@ -955,16 +985,33 @@
 	RET
 
 #JNI_Env_findClass ( --POS-- - JNI_Env_ADD_POS )
-	SGN X01
+	SGN X02
 	JMPGT JNI_Env_findClass_module_known
 	#REL_POS ( native_exec_class_POS - --POS-- )
-	MOV X01, [IP + REL_POS]
-	MOV X01, [X01 + object_class_instance_module_OFF]
+	MOV X02, [IP + REL_POS]
+	MOV X02, [X02 + object_class_instance_module_OFF]
 	@JNI_Env_findClass_module_known
-		
-		|> TODO implement
-		
-		RET
+		MOV X00, [X02 + module_instance_folder_OFF]
+		INT INT_FOLDER_OPEN_DESC_FILE_OF_PATH
+		JMPERR err_class_not_found
+		INT INT_ELEMENT_GET_FLAGS
+		JMPERR err_class_not_found_closeX00
+		BCP X01, CLASS_FILE_FLAG
+		JMPNB err_class_not_found_closeX00
+		MOV X03, X00 |> save id for later
+		MOV X02, 1
+		XOR X01, X01
+		INT INT_FILE_LOAD_LIB
+		SWAP X03, X00
+		JMPERR err_class_not_found_closeX00
+		INT INT_ELEMENT_CLOSE |> can't fail here
+		MOV X03, X00
+		JMP add_local_reference
+		@err_class_not_found_closeX00
+			INT INT_ELEMENT_CLOSE
+		@err_class_not_found
+			MOV ERRNO, ERR_JAVA_NO_SUCH_CLASS
+			RET
 
 #JNI_Env_findInstanceMethod ( --POS-- - JNI_Env_ADD_POS )
 	|> TODO implement
@@ -1083,15 +1130,21 @@
 	#REL_POS ( JNI_Env_POS - --POS-- )
 	LEA X1F, REL_POS
 	PUSH X00
-	XOR X00, X00
+	#JNI_Env_LEN_m8 ( JNI_Env_LEN - 8 )
+	MOV X00, JNI_Env_LEN_m8
 	@pvm_java_INIT_JNI_env_loop
-	~IF #~ME
-		#EXP~JNI_Env_ADD_POS --POS--
-	~ENDIF
-	ADD [X1F + X00], IP
-	ADD X00, 8
-	CMP X00, JNI_Env_LEN
-	JMPLT pvm_java_INIT_JNI_env_loop
+		~IF #~ME
+			#EXP~JNI_Env_ADD_POS --POS--
+		~ENDIF
+		ADD [X1F + X00], IP
+		USUB X00, 8
+		JMPCC pvm_java_INIT_JNI_env_loop
+	#REL_POS ( modules_set_hash_POS - --POS-- )
+	#REL_POS2 ( ( modules_set_POS + hashset_hashmaker_OFF ) - --POS-- )
+	LEA [IP + REL_POS2], REL_POS
+	#REL_POS ( modules_set_equal_POS - --POS-- )
+	#REL_POS2 ( ( modules_set_POS + hashset_equalizer_OFF ) - --POS-- )
+	LEA [IP + REL_POS2], REL_POS
 	POP X00
 	RET
 

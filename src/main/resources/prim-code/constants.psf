@@ -1,16 +1,16 @@
 | this constant indicates that an java exception is currently thrown
-ERR_JAVA_THROW=UHEX-11
+ERR_JAVA_THROW=UHEX-7F
 | this constant indicates that a non-existing class was searched
-ERR_JAVA_NO_SUCH_CLASS=UHEX-12
+ERR_JAVA_NO_SUCH_CLASS=UHEX-7E
 | this constant indicates that a non-existing method was searched
-ERR_JAVA_NO_SUCH_METHOD=UHEX-12
+ERR_JAVA_NO_SUCH_METHOD=UHEX-7D
 | this constant indicates that a non-existing field was searched
-ERR_JAVA_NO_SUCH_FIELD=UHEX-13
+ERR_JAVA_NO_SUCH_FIELD=UHEX-7C
 | this constant indicates that it was tried to access a field or invoce a method, which is not visible
 | this constant can also indicate that a static/instance field/method was treated like an instance/static field/method
-ERR_JAVA_PERM=UHEX-14
+ERR_JAVA_PERM=UHEX-7B
 | this constant indicates that a cast failed
-ERR_JAVA_CAST=UHEX-15
+ERR_JAVA_CAST=UHEX-7A
 | `X00` stores a reference to the exception instance which should been thrown
 | `ERRNO` will be set to `ERR_JAVA_THROW`
 | if there is already an exception instance which is being thrown, it will be catched and ignored
@@ -32,8 +32,8 @@ JNI_Env_catch_OFF=UHEX-18
 | `X00` will be set to a reference of the module
 | if the module could not be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_CLASS`
 JNI_Env_findModule_OFF=UHEX-20
-| `X00` is set to an _UTF-8_ `\0` terminated string, which contains the class binary name
-| `X01` is set to a negative value or zero or an _UTF-8_ `\0` terminated string, which contains the module name
+| `X01` is set to an _UTF-8_ `\0` terminated string, which contains the class binary name
+| `X02` is set to a negative value or zero or an _UTF-8_ `\0` terminated string, which contains the module name
 |   + if `X01` is negative or zero the current module will be used
 |     + if there is no current module (the native code was not called by java code) the behavior is undefined
 | `X00` will be set to a reference of the class

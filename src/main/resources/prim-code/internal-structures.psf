@@ -15,20 +15,24 @@
 | You should have received a copy of the GNU General Public License
 | along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+|:	special flag used to mark class files
+|	this flag is needed, because class files are stored as native mashine code
+|:>
+CLASS_FILE_FLAG=UHEX-00800000
 
-|:	// all object instances are 8-bytes aligned
+|:	// all object instances are 8-byte/64-bit aligned
 |	struct object_instance {
-|		struct object_instance#EXP~ class; // off = HEX-0
-|		union field[] fields;              // off = HEX-8
+|		struct object_instance class; // off = HEX-0
+|		union field[] fields;         // off = HEX-8
 |	}
 |:>
 object_instance_fields_OFF=UHEX-8
 |:	struct string_instance {
-|		struct object_instance#EXP~ class; // off = HEX-0
-|		struct array_instance#EXP~ value;  // off = HEX-8
-|		dword hash;                        // off = HEX-10
-|		byte coder;                        // off = HEX-14
-|		ubyte hash_is_zero;                // off = HEX-15
+|		struct object_instance class;     // off = HEX-0
+|		struct array_instance#EXP~ value; // off = HEX-8
+|		dword hash;                       // off = HEX-10
+|		byte coder;                       // off = HEX-14
+|		ubyte hash_is_zero;               // off = HEX-15
 |	}
 |:>
 string_instance_value_OFF=UHEX-8
@@ -36,24 +40,24 @@ string_instance_hash_OFF=UHEX-10
 string_instance_coder_OFF=UHEX-14
 string_instance_hash_is_zero_OFF=UHEX-15
 |:	struct module_instance {
-|		struct object_instance#EXP~ class;      // off = HEX-0
-|		struct object_instance#EXP~ layer;      // off = HEX-8
-|		struct object_instance#EXP~ name;       // off = HEX-10
-|		struct object_instance#EXP~ loader;     // off = HEX-18
-|		struct object_instance#EXP~ descriptor; // off = HEX-20
-|		num folder;                         // off = HEX-28
-|		ubyte enableNativeAccess;           // off = HEX-30
+|		struct object_instance class;      // off = HEX-0
+|		num folder;                        // off = HEX-8
+|		struct object_instance layer;      // off = HEX-10
+|		struct object_instance name;       // off = HEX-18
+|		struct object_instance loader;     // off = HEX-20
+|		struct object_instance descriptor; // off = HEX-28
+|		ubyte enableNativeAccess;          // off = HEX-30
 |	}
 |:>
-module_instance_layer_OFF=UHEX-8
-module_instance_name_OFF=UHEX-10
-module_instance_loader_OFF=UHEX-18
-module_instance_descriptor_OFF=UHEX-20
-module_instance_folder_OFF=UHEX-28
+module_instance_folder_OFF=UHEX-8
+module_instance_layer_OFF=UHEX-10
+module_instance_name_OFF=UHEX-18
+module_instance_loader_OFF=UHEX-20
+module_instance_descriptor_OFF=UHEX-28
 module_instance_enableNativeAccess_OFF=UHEX-30
 |:	struct class_instance {
-|		struct object_instance#EXP~ class;       // off = HEX-0
-|		ubyte type;                          // off = HEX-8
+|		struct object_instance class; // off = HEX-0
+|		ubyte type;                   // off = HEX-8
 |		// object_class_instance:    UHEX-0
 |		// array_class_instance:     UHEX-1
 |		// primitive_class_instance: UHEX-3
@@ -62,13 +66,13 @@ module_instance_enableNativeAccess_OFF=UHEX-30
 |:>
 class_instance_type_OFF=UHEX-8
 |:	struct object_class_instance {
-|		struct object_instance#EXP~ class;       // off = HEX-0
-|		struct object_instance#EXP~ module;      // off = HEX-8
+|		struct object_instance class;            // off = HEX-0
+|		struct object_instance module;           // off = HEX-8
 |		// all instances are aligned, so this is ok
 |		struct hash_set#EXP~ instance_fields_p;  // off = HEX-10
 |		struct hash_set#EXP~ instance_methods_p; // off = HEX-18
 |		struct hash_set#EXP~ static_fields_p;    // off = HEX-20
-|		struct hash_set static_methods;      // off = HEX-28
+|		struct hash_set static_methods;          // off = HEX-28
 |		struct hash_set instance_fields;
 |		struct hash_set instance_methods;
 |		struct hash_set static_fields;
@@ -80,32 +84,32 @@ object_class_instance_instance_methods_p_OFF=UHEX-18
 object_class_instance_static_fields_p_OFF=UHEX-20
 object_class_instance_static_methods_OFF=UHEX-28
 |:	struct array_class_instance {
-|		struct object_instance#EXP~ class;          // off = HEX-0
-|		num type;                               // off = HEX-8
-|		struct object_instance#EXP~ component_type; // off = HEX-10
+|		struct object_instance class;          // off = HEX-0
+|		num type;                              // off = HEX-8
+|		struct object_instance component_type; // off = HEX-10
 |	}
 |:>
 array_class_instance_component_type_OFF=UHEX-10
 |:	struct array_instance {
-|		struct object_instance#EXP~ class; // off = HEX-0
-|		num length;                    // off = HEX-8
-|		T[] value;                     // off = HEX-10
+|		struct object_instance class; // off = HEX-0
+|		num length;                   // off = HEX-8
+|		T[] value;                    // off = HEX-10
 |	}
 |:>
 array_instance_length_OFF=UHEX-8
 array_instance_value_OFF=UHEX-10
 |:	struct primitive_class_instance {
-|		struct object_instance#EXP~ class; // off = HEX-0
-|		uword type;                    // off = HEX-8
+|		struct object_instance class; // off = HEX-0
+|		uword type;                   // off = HEX-8
 |		// see the constants defined below
 |	}
 |:>
-prim_class_byte=UHEX-103
-prim_class_short=UHEX-203
-prim_class_int=UHEX-403
-prim_class_long=UHEX-803
+prim_class_byte=UHEX-0103
+prim_class_short=UHEX-0203
+prim_class_int=UHEX-0403
+prim_class_long=UHEX-0803
 prim_class_float=UHEX-1003
 prim_class_double=UHEX-2003
 prim_class_char=UHEX-4003
 prim_class_boolean=UHEX-8003
-prim_class_void=UHEX-3
+prim_class_void=UHEX-0003

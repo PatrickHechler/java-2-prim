@@ -7,18 +7,18 @@ the [Method excecution](#method-excecution) section describes how java methods a
 the [Initialisation](#initialization) section describes how _pvm-java_ can be initilized.    
 
 ## Error Constants
-+ `ERR_JAVA_THROW` : `17` : `HEX-11`
++ `ERR_JAVA_THROW` : `127` : `HEX-7F`
     + this constant indicates that an java exception is currently thrown
-+ `ERR_JAVA_NO_SUCH_CLASS` : `18` : `HEX-12`
++ `ERR_JAVA_NO_SUCH_CLASS` : `126` : `HEX-7E`
     + this constant indicates that a non-existing class was searched
-+ `ERR_JAVA_NO_SUCH_METHOD` : `18` : `HEX-12`
++ `ERR_JAVA_NO_SUCH_METHOD` : `125` : `HEX-7D`
     + this constant indicates that a non-existing method was searched
-+ `ERR_JAVA_NO_SUCH_FIELD` : `19` : `HEX-13`
++ `ERR_JAVA_NO_SUCH_FIELD` : `124` : `HEX-7C`
     + this constant indicates that a non-existing field was searched
-+ `ERR_JAVA_PERM` : `20` : `HEX-14`
++ `ERR_JAVA_PERM` : `123` : `HEX-7B`
     + this constant indicates that it was tried to access a field or invoce a method, which is not visible
     + this constant can also indicate that a static/instance field/method was treated like an instance/static field/method
-+ `ERR_JAVA_CAST` : `21` : `HEX-15`
++ `ERR_JAVA_CAST` : `122` : `HEX-7A`
     + this constant indicates that a cast failed
 
 ## Method call
@@ -112,8 +112,8 @@ Operations:
     + `X00` will be set to a reference of the module
     + if the module could not be found `ERRNO` will be set to `ERR_JAVA_NO_SUCH_CLASS`
 + `offset=40=HEX-28` : _findClass_
-    + `X00` is set to an _UTF-8_ `\0` terminated string, which contains the class binary name
-    + `X01` is set to a negative value or zero or an _UTF-8_ `\0` terminated string, which contains the module name
+    + `X01` is set to an _UTF-8_ `\0` terminated string, which contains the class binary name
+    + `X02` is set to a negative value or zero or an _UTF-8_ `\0` terminated string, which contains the module name
         + if `X01` is negative or zero the current module will be used
           + if there is no current module (the native code was not called by java code) the behavior is undefined
     + `X00` will be set to a reference of the class
@@ -230,7 +230,12 @@ java code can use none _JNI-Env_ operations except of the following:
 ### java code
 classes are loaded/found using the `INT_LOAD_LIB` interrupt.    
 all classes have to store the offset (as a 64-bit value) of their `<cinit>` method at the start of the file. (the offset is relative to the file-start)    
-if a class has no `<cinit>` method the offset is instead set to `-1`    
+if a class has no `<cinit>` method the offset is instead set to `-1`.
+
+the `<cinit>` method __must__ not modify any value other than `X01` and `X02`.    
+if the `<cinit>` method needs to modify other registers it has to restore the registers value before returning to the caller.
+
+the `<cinit>` method is guranteed to be called from the `INT_LOAD_LIB` interrupt.
 
 ### native code
 native code can load/find classes via the _JNI-Env_.
