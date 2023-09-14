@@ -528,7 +528,7 @@
 |	X03: set --> set_
 |	X04: hash --> oldval
 |	X05: remval --> ?
-|	X06 .. X09 : --> ?
+|	X06 .. X0E : --> ?
 |:>
 #EXP~hashset_remove_POS --POS--
 	|:	X03: set
@@ -804,6 +804,52 @@
 			MOV [X03 + hashset_maxi_OFF], 0
 			RET
 
+|:	func hashset_for_each(struct hashset# set, addr consumer) --> <struct hashset# set_, addr consumer_>
+|	X03: set --> set_
+|	X04: addr (struct hashset# set, addr consumer, num val) --> <struct hashset# set_, addr consumer_> consumer
+|		X03: set --> set_
+|		X04: consumer --> consumer_
+|		X05: val --> ?
+|		X06 .. X09: n --> n
+|	X05 .. X09 : --> ?
+|	note that this function ignores the ERRNO register
+|	this function does not need to do any cleanup and does not use the stack for anything except by using `RET`
+|		to stop the iteration the consumer can execute `SUB SP, 8   RET` (or `PUSH XNN   RET`)
+|:>
+#EXP~hashset_for_each_POS --POS--
+	MOV X06, [X03]
+	SGN X06
+	JMPLE return
+	|:	X03: set
+	|	X04: consumer
+	|	X05: -
+	|	X06: set#.entries
+	|	X07: offset of set#.entries
+	|:>
+	MOV X07, [X03 + hashset_maxi_OFF]
+	LSH X07, 3
+	@hs_for_each__loop
+		MOV X05, [X06 + X07]
+		CMP X05, -1
+		JMPEQ hs_for_each__loop_iter_end
+		JMPLT hs_for_each__loop__list
+		CALNO X04
+		@hs_for_each__loop_iter_end
+			USUB X07, 8
+			JMPCC hs_for_each__loop
+			RET
+		@hs_for_each__loop__list
+			MOV X08, X05
+			NOT X08
+			MOV X09, [X08]
+			@hs_for_each__loop__list__loop
+				MOV X05, [X08 + X09]
+				CALNO X04
+				@hs_for_each__loop__list__loop_iter_end
+					SUB X09
+					JMPZC hs_for_each__loop__list__loop
+			JMP hs_for_each__loop_iter_end
+
 
 #native_throw_POS --POS--
 : -1 >
@@ -910,11 +956,13 @@
 
 #JNI_Env_findClass ( --POS-- - JNI_Env_ADD_POS )
 	SGN X01
-	JMPGT JNI_Env_findClass_module_found
+	JMPGT JNI_Env_findClass_module_known
 	#REL_POS ( native_exec_class_POS - --POS-- )
 	MOV X01, [IP + REL_POS]
 	MOV X01, [X01 + object_class_instance_module_OFF]
-	@JNI_Env_findClass_module_found
+	@JNI_Env_findClass_module_known
+		
+		|> TODO implement
 		
 		RET
 
