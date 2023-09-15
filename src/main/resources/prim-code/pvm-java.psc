@@ -1,27 +1,25 @@
-|:This file is part of the java-2-prim Project
-| DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-| Copyright (C) 2023 Patrick Hechler
-|
-| This program is free software: you can redistribute it and/or modify
-| it under the terms of the GNU General Public License as published by
-| the Free Software Foundation, either version 3 of the License, or
-| (at your option) any later version.
-|
-| This program is distributed in the hope that it will be useful,
-| but WITHOUT ANY WARRANTY; without even the implied warranty of
-| MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-| GNU General Public License for more details.
-|
-| You should have received a copy of the GNU General Public License
-| along with this program. If not, see <https://www.gnu.org/licenses/>.
-|:>
+|> This file is part of the java-2-prim Project
+|> DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+|> Copyright (C) 2023 Patrick Hechler
+|>
+|> This program is free software: you can redistribute it and/or modify
+|> it under the terms of the GNU General Public License as published by
+|> the Free Software Foundation, either version 3 of the License, or
+|> (at your option) any later version.
+|>
+|> This program is distributed in the hope that it will be useful,
+|> but WITHOUT ANY WARRANTY; without even the implied warranty of
+|> MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+|> GNU General Public License for more details.
+|>
+|> You should have received a copy of the GNU General Public License
+|> along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 ~IF #~ME
 	#pvm_java_INIT 0
 	#pvm_java_MAIN 0
 	#pvm_java_INIT_ADD_POS 0
-	
-#JNI_Env_ADD_POS 0
+	#JNI_Env_ADD_POS 0
 ~ELSE
 	~READ_SYM "constants.psf" >
 	~READ_SYM "internal-structures.psf" >
@@ -875,7 +873,8 @@
 |			X05: b --> b
 |			X06..X0F: n --> n // both inclusive
 |:>
-#modules_set_equal_POS --POS--
+#hs_object_equal --POS--
+	
 	|> TODO implement
 
 |:		func (num val) --> <unum hash> hashmaker;         // off = HEX-20
@@ -883,7 +882,8 @@
 |			X04: val --> hash
 |			X05..X0F: n --> n // both inclusive
 |:>
-#modules_set_hash_POS --POS--
+#hs_object_hash --POS--
+	
 	|> TODO implement
 
 |:	creates a new local reference and let it refer to the X00 value
@@ -1139,10 +1139,10 @@
 		ADD [X1F + X00], IP
 		USUB X00, 8
 		JMPCC pvm_java_INIT_JNI_env_loop
-	#REL_POS ( modules_set_hash_POS - --POS-- )
+	#REL_POS ( hs_object_hash - --POS-- )
 	#REL_POS2 ( ( modules_set_POS + hashset_hashmaker_OFF ) - --POS-- )
 	LEA [IP + REL_POS2], REL_POS
-	#REL_POS ( modules_set_equal_POS - --POS-- )
+	#REL_POS ( hs_object_equal - --POS-- )
 	#REL_POS2 ( ( modules_set_POS + hashset_equalizer_OFF ) - --POS-- )
 	LEA [IP + REL_POS2], REL_POS
 	POP X00
