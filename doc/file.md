@@ -25,16 +25,24 @@ the [Initialisation](#initialization) section describes how _pvm-java_ can be in
 ### java code register modification
 the java code must restore the values of all used registers, except for the following:
 + `X00`, `X01` and `X02`
-    + they can be freely used, since many interrupts need/use them
+    + they can be freely used
+    + many interrupts need/use them
 + `X10` .. `X1D`
-    + they are intended to be used by local variables, temporary values or simmilar
+    + they can freely be used
++ `X1E`, `X20`
+    + see below for restrictions
+    + when returning these registers are ignored, until overwritten
++ registers used to pass arguments other than the `X20` register   
+    + they can freely be used
 + `XA0` .. `XF9`
-    + they are intended to be used by local variables, temporary values or simmilar
+    + they can freely be used
 
 additional the following registers must always be set to their value when the _pvm-java_ can be executed.    
 note that _pvm-java_ can almost always be executed, since [_pvm-java#INIT_](#_pvm-java-init_) is allowed to redirect interrupts to _pvm-java_
 + `X1E`: state
     + `0`: tring to call a method
+        + during this state the `X20` register can have any value
+        + the value normally stored in the `X20` state is instead stored on the address `[SP - 8]`
     + `8`: executing a static method
     + `16`: executing a instance method
 + `X1F`: _JNI-Env_
