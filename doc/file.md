@@ -35,7 +35,8 @@ the java code must restore the values of all used registers, except for the foll
 + registers used to pass arguments other than the `X20` register   
     + they can freely be used
 + `XA0` .. `XF9`
-    + they can freely be used
+    + they can freely be used    
+when returning these registers are ignored, until overwritten
 
 additional the following registers must always be set to their value when the _pvm-java_ can be executed.    
 note that _pvm-java_ can almost always be executed, since [_pvm-java#INIT_](#_pvm-java-init_) is allowed to redirect interrupts to _pvm-java_
