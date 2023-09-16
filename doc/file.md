@@ -5,6 +5,8 @@ the [_JNI-Env_](#_jni-env_) section list all operations of the _JNI-Env_.
 the [Class Loading](#class-loading) section describes how classes are loaded and found    
 the [Method excecution](#method-excecution) section describes how java methods are executed.    
 the [Initialisation](#initialization) section describes how _pvm-java_ can be initilized.    
+the [java code restrictions](#java-code-restrictions) section describes what restrictions apply to translated java code.
+after the java code was translated, it __must__ follow those restrictions.     
 
 ## Error Constants
 + `ERR_JAVA_THROW` : `127` : `HEX-7F`
@@ -21,34 +23,8 @@ the [Initialisation](#initialization) section describes how _pvm-java_ can be in
 + `ERR_JAVA_CAST` : `122` : `HEX-7A`
     + this constant indicates that a cast failed
 
+
 ## Method call
-### java code register modification
-the java code must restore the values of all used registers, except for the following:
-+ `X00`, `X01` and `X02`
-    + they can be freely used
-    + many interrupts need/use them
-+ `X10` .. `X1D`
-    + they can freely be used
-+ `X1E`, `X20`
-    + see below for restrictions
-    + when returning these registers are ignored, until overwritten
-+ registers used to pass arguments other than the `X20` register   
-    + they can freely be used
-+ `XA0` .. `XF9`
-    + they can freely be used    
-when returning these registers are ignored, until overwritten
-
-additional the following registers must always be set to their value when the _pvm-java_ can be executed.    
-note that _pvm-java_ can almost always be executed, since [_pvm-java#INIT_](#_pvm-java-init_) is allowed to redirect interrupts to _pvm-java_
-+ `X1E`: state
-    + `0`: tring to call a method
-        + during this state the `X20` register can have any value
-        + the value normally stored in the `X20` state is instead stored on the address `[SP - 8]`
-    + `8`: executing a static method
-    + `16`: executing a instance method
-+ `X1F`: _JNI-Env_
-+ `X20`: `this` or if static method the current executing `class`
-
 ### _JNI-Env_ Argument
 #### Java code calls
 the _JNI-Env_ pointer is passed in the `X1F` register    
@@ -383,3 +359,65 @@ $not-align |> UTF-8 strings do not need to be 64-bit aligned
 #EXP~OFF_LEA_DEF_MODULE (--POS-- - POS_LEA_DEF_MODULE)
 : CHARS 'UTF-8' "my.module\0" > |> only needed if defMainModule should be set
 ```
+
+## java code restrictions
+### register modification
+the java code must restore the values of all used registers, except for the following:
++ `X00`
+    + can be freely used
+    + almost all interrupts need/use this register
+    + used for return values
++ `X01` and `X02`
+    + they can be freely used
+    + many interrupts need/use them
++ `X10` .. `X1C`
+    + they can freely be used
++ `X1D`, `X1E` and `X20`
+    + see below for restrictions
+    + when returning these registers are ignored, until overwritten
++ registers used to pass arguments other than the `X20` register
+    + they can freely be used
++ `XA0` .. `XF9`
+    + they can freely be used
+
+additional the following registers must always be set to their value when the _pvm-java_ can be executed.    
+note that _pvm-java_ can almost always be executed, since [_pvm-java#INIT_](#_pvm-java-init_) is allowed to redirect interrupts to _pvm-java_
++ `X1D`: error handling address
+    + absolute address to be jumped on error
+    + `0` when no error handling is done in this method and this method never uses the stack
+        + it is possible for _pvm-java_ error handling code to be executed for the method, the value `[SP - 8]` must refer to the calling method
++ `X1E`: state
+    + `0`: tring to call a method
+        + during this state the `X20` register can have any value
+        + the value normally stored in the `X20` state is instead stored on the address `[SP - 8]`
+    + `8`: executing a static method
+    + `16`: executing a instance method
++ `X1F`: _JNI-Env_
++ `X20`: `this` or if static method the current executing `class`
+
+some methods have additional restrictions on register modifications:
++ `<cinit>`:
+    + see [Class Loading](#class-loading)
+
+### interrupts
+if an interrupt fails and leads to the execution of the illegal memory interrupt, it __must__ fail, because there is not enugh memory available:
++ java code is not allowed to use interrupts to check if an object is non-`null`
++ java code is allowed to check with the `INT` command if a newly allocated memory block allocated using `INT INT_MEMORY_ALLOC` is valid
+    + this is allowed, bacause `INT_MEMORY_ALLOC` only fails, if there is not enugh memory available (if the passed length is valid)
++ this means for example, before array content is copied the array needs to be checked agains `null` without using the `INT` command
+    + for example by doing a `SGN`/`CMP` check or by accessing the memory with a `MOV` command
+
+### illegal memory access
+illegal memory access is allowed:
++ illegal memory access by one of the following commands lead to an `java.lang.OutOfMemoryError`:
+    + `PUSH`
+    + `PUSHBLK`
+    + `CALL`
+    + `INT`
+    + `CALO`
+    + `CALNO`
++ illegal memory access by one of the following commands lead to a `java.lang.NullPointerException`:
+    + all commands not listed above
+
+### aritmethic error
+aritmethic errors are only allowed to occur, if the reason is dividing by zero

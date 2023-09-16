@@ -844,7 +844,7 @@
 				MOV X05, [X08 + X09]
 				CALNO X04
 				@hs_for_each__loop__list__loop_iter_end
-					SUB X09
+					SUB X09, 8
 					JMPZC hs_for_each__loop__list__loop
 			JMP hs_for_each__loop_iter_end
 
@@ -873,8 +873,7 @@
 |			X05: b --> b
 |			X06..X0F: n --> n // both inclusive
 |:>
-#hs_object_equal --POS--
-	
+#hs_modules_equal --POS--
 	|> TODO implement
 
 |:		func (num val) --> <unum hash> hashmaker;         // off = HEX-20
@@ -882,8 +881,7 @@
 |			X04: val --> hash
 |			X05..X0F: n --> n // both inclusive
 |:>
-#hs_object_hash --POS--
-	
+#hs_modules_hash --POS--
 	|> TODO implement
 
 |:	creates a new local reference and let it refer to the X00 value
@@ -1090,6 +1088,7 @@
 	RET
 
 
+: 1 >
 #JNI_Env_POS --POS--
 :
 	|> GENERATED-CODE-START
@@ -1126,27 +1125,149 @@
 
 #JNI_Env_LEN ( --POS-- - JNI_Env_POS )
 
+|:	during native code execution do not overwrite those interrupts
+|	illegal memory:
+|		fast for: throw new NullPointerException();
+|	aritmetic error:
+|		fast for: throw new AritmeticException("/ by 0");
+|:>
+
+#OFF_ILL_MEM ( INT_ERROR_ILLEGAL_MEMORY * 8 )
+#OFF_AR_ERR ( INT_ERROR_ARITHMETIC_ERROR * 8 )
+
+$not-align
+
+#AR_ERR_PATH_POS --POS--
+: CHARS 'UTF-8' "/java/base/java/lang/ArithmeticException.class\0" >
+
+#OOM_ERR_PATH_POS --POS--
+: CHARS 'UTF-8' "/java/base/java/lang/OutOfMemoryError.class\0" >
+
+#NP_ERR_PATH_POS --POS--
+: CHARS 'UTF-8' "/java/base/java/lang/NullPointerException.class\0" >
+
+#AR_ERR_MSG_POS --POS--
+: CHARS 'ASCII' "/ by zero" >
+#AR_ERR_MSG_LEN ( --POS-- - AR_ERR_MSG_POS )
+
+$align
+:>
+
+#JAVA_INT_ILLEGAL_MEMORY --POS--
+	#REL_POS ( JNI_Env_POS - 8 - --POS-- )
+	SGN [IP + REL_POS]
+	JMPNE NATIVE_INT_ILL_MEM
+		#STATUS_ALL_EXCEPT_EQUAL ( -1 ^ STATUS_EQUAL )
+		AND STATUS, STATUS_ALL_EXCEPT_EQUAL
+		|:	X00:
+		|		0: illegal mem
+		|		1: aritmetic error
+		|	other reigsters: unmodified since interrupt
+		|:>
+		@JAVA_INT_HANDLER
+			|> X09 stores interrupt pointer
+			|> IP register is at offset HEX-0
+			|> ERRNO register is at offset HEX-28
+			|> X00 register is at offset HEX-30
+			|> X09 is the last saved register
+			MOV [X09 + HEX-28], ERR_JAVA_THROW
+			XOR ERRNO, ERRNO |> allow use of JMPERR
+			JMPEQ JAVA_INT_HANDLER__ILL_MEM
+				
+				|> TODO implement
+				JMP JAVA_INT_HANDLER__END
+			@JAVA_INT_HANDLER__ILL_MEM
+				XOR X01, X01
+				MOV X02, [X09]
+				MVW X01, [X02]
+				CMP X01, UHEX-0004 |> MOV
+				JMPEQ JAVA_INT_HANDLER__ILL_MEM__NPE
+				CMP X01, UHEX-0320 |> PUSH
+				JMPEQ @JAVA_INT_HANDLER__ILL_MEM__OOM
+				CMP X01, UHEX-0322 |> PUSHBLK
+				JMPEQ @JAVA_INT_HANDLER__ILL_MEM__OOM
+				CMP X01, UHEX-0300 |> CALL
+				JMPEQ @JAVA_INT_HANDLER__ILL_MEM__OOM
+				CMP X01, UHEX-0230 |> INT
+				JMPEQ @JAVA_INT_HANDLER__ILL_MEM__OOM
+				CMP X01, UHEX-0301 |> CALO
+				JMPEQ @JAVA_INT_HANDLER__ILL_MEM__OOM
+				CMP X01, UHEX-0302 |> CALNO
+				JMPEQ @JAVA_INT_HANDLER__ILL_MEM__OOM
+				@JAVA_INT_HANDLER__ILL_MEM__NPE
+					#REL_POS ( NP_ERR_PATH_POS - --POS-- )
+					LEA X00, REL_POS
+					XOR X01, X01
+					MOV X02, 1
+					INT INT_LOAD_LIB
+					JMPERR JAVA_INT_HANDLER__ILL_MEM__LOAD_LIB_ERR
+					
+					
+					|> TODO implement
+					JMP JAVA_INT_HANDLER__END
+				@JAVA_INT_HANDLER__ILL_MEM__OOM
+					
+					|> TODO implement
+					
+			@JAVA_INT_HANDLER__END
+			|> overwrite IP and return
+			SGN X1D
+			JMPLE JAVA_INT_HANDLER__RETURN
+				MOV [X09], X1D
+				IRET
+			@JAVA_INT_HANDLER__RETURN
+				POP [X09]
+				IRET
+			@JAVA_INT_HANDLER__ILL_MEM__LOAD_LIB_ERR
+				
+				|> TODO implement
+				
+	@NATIVE_INT_ILL_MEM
+		MOV [INTP + OFF_ILL_MEM], -1
+		INT INT_ERROR_ILLEGAL_MEMORY
+
+#JAVA_INT_ARITHMETIC_ERROR --POS--
+	#REL_POS ( JNI_Env_POS - 8 - --POS-- )
+	SGN [IP + REL_POS]
+	JMPNE NATIVE_INT_AR_ERR
+		OR STATUS, STATUS_EQUAL
+		JMP JAVA_INT_HANDLER
+	@NATIVE_INT_AR_ERR
+		MOV [INTP + OFF_AR_ERR], -1
+		INT INT_ERROR_ARITHMETIC_ERROR
+
 #EXP~pvm_java_INIT --POS--
-	#REL_POS ( JNI_Env_POS - --POS-- )
-	LEA X1F, REL_POS
-	PUSH X00
-	#JNI_Env_LEN_m8 ( JNI_Env_LEN - 8 )
-	MOV X00, JNI_Env_LEN_m8
-	@pvm_java_INIT_JNI_env_loop
-		~IF #~ME
-			#EXP~JNI_Env_ADD_POS --POS--
-		~ENDIF
-		ADD [X1F + X00], IP
-		USUB X00, 8
-		JMPCC pvm_java_INIT_JNI_env_loop
-	#REL_POS ( hs_object_hash - --POS-- )
-	#REL_POS2 ( ( modules_set_POS + hashset_hashmaker_OFF ) - --POS-- )
-	LEA [IP + REL_POS2], REL_POS
-	#REL_POS ( hs_object_equal - --POS-- )
-	#REL_POS2 ( ( modules_set_POS + hashset_equalizer_OFF ) - --POS-- )
-	LEA [IP + REL_POS2], REL_POS
-	POP X00
-	RET
+	|> save X00
+		PUSH X00
+	|> init JNI-Env
+		|> init JNI-Env register
+			#REL_POS ( JNI_Env_POS - --POS-- )
+			LEA X1F, REL_POS
+		|> make the JNI-Env.* relative addresses absolute
+			#JNI_Env_LEN_m8 ( JNI_Env_LEN - 8 )
+			MOV X00, JNI_Env_LEN_m8
+			@pvm_java_INIT_JNI_env_loop
+				~IF #~ME
+					#EXP~JNI_Env_ADD_POS --POS--
+				~ENDIF
+				ADD [X1F + X00], IP
+				USUB X00, 8
+				JMPCC pvm_java_INIT_JNI_env_loop
+	|> init module hash set
+		#REL_POS ( hs_modules_hash - --POS-- )
+		#REL_POS2 ( ( modules_set_POS + hashset_hashmaker_OFF ) - --POS-- )
+		LEA [IP + REL_POS2], REL_POS
+		#REL_POS ( hs_modules_equal - --POS-- )
+		#REL_POS2 ( ( modules_set_POS + hashset_equalizer_OFF ) - --POS-- )
+		LEA [IP + REL_POS2], REL_POS
+	|> overwrite interrupts, which can occure during java code execution
+		#REL_POS ( JAVA_INT_ILLEGAL_MEMORY - --POS-- )
+		LEA [INTP + OFF_ILL_MEM], REL_POS
+		#REL_POS ( JAVA_INT_ARITHMETIC_ERROR - --POS-- )
+		LEA [INTP + OFF_AR_ERR], REL_POS
+	|> restore X00 and return
+		POP X00
+		RET
 
 #EXP~pvm_java_MAIN --POS--
-	|> TODO implement
+		|> TODO implement
