@@ -83,6 +83,14 @@ object_class_instance_instance_fields_p_OFF=UHEX-10
 object_class_instance_instance_methods_p_OFF=UHEX-18
 object_class_instance_static_fields_p_OFF=UHEX-20
 object_class_instance_static_methods_OFF=UHEX-28
+|:	struct hs_entry {
+|		char# name;
+|		char# describtor;
+|		num pntr;
+|	}
+|:>
+hs_entry_describtor_OFF=UHEX-8
+hs_entry_pntr_OFF=UHEX-10
 |:	struct array_class_instance {
 |		struct object_instance class;          // off = HEX-0
 |		num type;                              // off = HEX-8

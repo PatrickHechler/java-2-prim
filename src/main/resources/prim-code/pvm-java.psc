@@ -65,6 +65,7 @@
 |	other registers may also be modified if set#.equalizer modifies them
 |:>
 #EXP~hashset_get_POS --POS--
+@hashset_get
 	MOV X07, [X03]
 	SGN X07
 	JMPLE returnX04_m1
@@ -529,6 +530,7 @@
 |	X06 .. X0E : --> ?
 |:>
 #EXP~hashset_remove_POS --POS--
+@hashset_remove
 	|:	X03: set
 	|	X04: hash
 	|	X05: remval
@@ -1139,12 +1141,27 @@ $not-align
 
 #AR_ERR_PATH_POS --POS--
 : CHARS 'UTF-8' "/java/base/java/lang/ArithmeticException.class\0" >
+|>                        .class + serialVUID + emptyArgConstructor
+#AR_ERR_CONSTRUCTOR_OFF ( 8      + 8          + 8                   )
 
 #OOM_ERR_PATH_POS --POS--
 : CHARS 'UTF-8' "/java/base/java/lang/OutOfMemoryError.class\0" >
+|>                         .class + serialVUID
+#OOM_ERR_CONSTRUCTOR_OFF ( 8      + 8           )
 
 #NP_ERR_PATH_POS --POS--
 : CHARS 'UTF-8' "/java/base/java/lang/NullPointerException.class\0" >
+|>                        .class + serialVUID
+#NP_ERR_CONSTRUCTOR_OFF ( 8      + 8           )
+
+#STRING_PATH_POS --POS--
+: CHARS 'UTF-8' "/java/base/java/lang/String.class\0" >
+
+#STRING_of_ascii_name_POS --POS--
+: CHARS 'ASCII' "ofASCII\0" >
+
+#STRING_of_ascii_desc_POS --POS--
+: CHARS 'ASCII' "(J)Ljava/lang/String;\0" >
 
 #AR_ERR_MSG_POS --POS--
 : CHARS 'ASCII' "/ by zero" >
@@ -1173,8 +1190,50 @@ $align
 			MOV [X09 + HEX-28], ERR_JAVA_THROW
 			XOR ERRNO, ERRNO |> allow use of JMPERR
 			JMPEQ JAVA_INT_HANDLER__ILL_MEM
-				
-				|> TODO implement
+				|> / by zero
+				#REL_POS ( STRING_PATH_POS - --POS-- )
+				LEA X00, REL_POS
+				XOR X01, X01
+				MOV X02, 1
+				INT INT_LOAD_LIB
+				JMPERR JAVA_INT_HANDLER__ILL_MEM__LOAD_LIB_ERR
+				MOV X00, [X00]
+				#REL_POS ( STRING_of_ascii_name_POS - --POS-- )
+				LEA X08, REL_POS
+				#REL_POS ( STRING_of_ascii_desc_POS - --POS-- )
+				LEA X09, REL_POS
+				#X08_ADDR ( REGISTER_MEMORY_START_XNN + ( 8 * 8 ) )
+				MVAD X03, X00, object_class_instance_static_methods_OFF
+				MOV X04, X08_ADDR
+				CALL method_hs_hash |> TODO find better name, method/field hs entries have the same structure
+				|> if this does not successfully calculate the hash we are doomed
+|:
+|	X03: set --> set
+|	X04: hash --> result (negative: not found; other: value)
+|	X05: val --> ?
+|	X06, X07: --> ?
+|	other registers may also be modified if set#.equalizer modifies them
+|:>
+				MOV X05, X08_ADDR
+				CALL hashset_get |> if this does not successfully finds the method we are doomed
+|:	func hashset_get(struct hashset# set, unum hash, num val) --> <struct hashset# set_, num result>
+|	X03: set --> set
+|	X04: hash --> result (negative: not found; other: value)
+|	X05: val --> ?
+|	X06, X07: --> ?
+|	other registers may also be modified if set#.equalizer modifies them
+|:>
+				CALO X00, hs_entry_pntr_OFF
+				#REL_POS ( NP_ERR_PATH_POS - --POS-- )
+				LEA X00, REL_POS
+				XOR X01, X01
+				MOV X02, 1
+				INT INT_LOAD_LIB
+				JMPERR JAVA_INT_HANDLER__ILL_MEM__LOAD_LIB_ERR
+				MOV X09, X21
+				MOV X21, X00
+				CALO X00, AR_ERR_CONSTRUCTOR_OFF
+				MOV X21, X09
 				JMP JAVA_INT_HANDLER__END
 			@JAVA_INT_HANDLER__ILL_MEM
 				XOR X01, X01
@@ -1201,22 +1260,25 @@ $align
 					MOV X02, 1
 					INT INT_LOAD_LIB
 					JMPERR JAVA_INT_HANDLER__ILL_MEM__LOAD_LIB_ERR
-					
-					
-					|> TODO implement
+					CALO X00, NP_ERR_CONSTRUCTOR_OFF
 					JMP JAVA_INT_HANDLER__END
 				@JAVA_INT_HANDLER__ILL_MEM__OOM
-					
-					|> TODO implement
-					
+					#REL_POS ( OOM_ERR_PATH_POS - --POS-- )
+					LEA X00, REL_POS
+					XOR X01, X01
+					MOV X02, 1
+					INT INT_LOAD_LIB
+					JMPERR JAVA_INT_HANDLER__ILL_MEM__LOAD_LIB_ERR
+					CALO X00, OOM_ERR_CONSTRUCTOR_OFF
 			@JAVA_INT_HANDLER__END
-			|> overwrite IP and return
+			|> overwrite X00 and IP and return
+			MOV [X09 + HEX-30], X00 |> set X00 to the throwable
 			SGN X1D
 			JMPLE JAVA_INT_HANDLER__RETURN
-				MOV [X09], X1D
+				MOV [X09], X1D |> set ip to the error handling address
 				IRET
 			@JAVA_INT_HANDLER__RETURN
-				POP [X09]
+				POP [X09] |> set ip to the calling method
 				IRET
 			@JAVA_INT_HANDLER__ILL_MEM__LOAD_LIB_ERR
 				

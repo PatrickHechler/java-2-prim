@@ -386,6 +386,7 @@ note that _pvm-java_ can almost always be executed, since [_pvm-java#INIT_](#_pv
     + absolute address to be jumped on error
     + `0` when no error handling is done in this method and this method never uses the stack
         + it is possible for _pvm-java_ error handling code to be executed for the method, the value `[SP - 8]` must refer to the calling method
+    + this value is only used by _pvm-java_ when an error illegal memory or aritmetic error interrupt occurs
 + `X1E`: state
     + `0`: tring to call a method
         + during this state the `X20` register can have any value
