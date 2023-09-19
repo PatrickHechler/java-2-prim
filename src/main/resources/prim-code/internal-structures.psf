@@ -91,6 +91,7 @@ object_class_instance_static_methods_OFF=UHEX-28
 |:>
 hs_entry_describtor_OFF=UHEX-8
 hs_entry_pntr_OFF=UHEX-10
+hs_entry_pntr_SIZE=UHEX-18
 |:	struct array_class_instance {
 |		struct object_instance class;          // off = HEX-0
 |		num type;                              // off = HEX-8
