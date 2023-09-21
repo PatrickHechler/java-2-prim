@@ -66,7 +66,7 @@ native code can use the `JNI-Env` to do the following exception handling related
 + ask/find out if there is an exception which is currently being thrown.
 + catch the exception instance which is currently being thrown
     + by doing so the native code also gets a reference to the exception instance
-    + if `ERRNO` is still set to `ERR_JAVA_THROW` _pvm-java_ sets it to `0`
+    + _pvm-java_ sets `ERRNO` to `0`
 
 1. when native code returns,
 2. no exception instance is currently being thrown and
