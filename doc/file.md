@@ -108,6 +108,7 @@ Operations:
     + sets `X00` to a reference of the exception instance, which is now handled
     + sets `X00` to a `-1` if currently there is no exception instance being thrown
     + modifies `X01` and `X02` if an excception is now handled
+    + sets `ERRNO` to `0`
 + `offset=32=HEX-20` : _findModule_
     + `X00` is set to a negative value or zero or an _UTF-8_ `\0` terminated string, which contains the module name
         + if `X01` is negative or zero the current module will be used

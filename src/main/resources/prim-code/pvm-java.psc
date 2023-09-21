@@ -973,6 +973,7 @@
 		RET
 
 #JNI_Env_catch ( --POS-- - JNI_Env_ADD_POS )
+	XOR ERRNO, ERRNO
 	MOV X00, -1
 	#REL_POS ( native_throw_POS - --POS-- )
 	SWAP X00, [IP + REL_POS]
